@@ -1,0 +1,448 @@
+---
+title: Getting Started
+description: Step-by-step guide to using the Pensar Apex API
+---
+
+## Installation
+
+Install Pensar Apex as a dependency in your TypeScript/JavaScript project:
+
+<CodeGroup>
+
+```bash npm
+npm install @pensar/apex
+```
+
+```bash yarn
+yarn add @pensar/apex
+```
+
+```bash bun
+bun add @pensar/apex
+```
+
+</CodeGroup>
+
+<Note>
+Pensar Apex requires **Bun 1.0+** or **Node.js 18+** as the runtime. The package is written in TypeScript and includes full type definitions.
+</Note>
+
+## Prerequisites
+
+Before you start, you'll need:
+
+1. **An AI provider API key** - Pensar Apex supports:
+   - Anthropic (Claude) - recommended for best results
+   - OpenAI (GPT-4)
+   - AWS Bedrock
+   - OpenRouter
+
+2. **Environment variables** for your AI provider:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+# or
+export OPENAI_API_KEY="sk-..."
+```
+
+## Basic Usage
+
+Here's a complete example that runs a security assessment on a web application:
+
+<Steps>
+
+<Step title="Import the API">
+
+Import the session manager and agent runner functions:
+
+```typescript src/example.ts
+import { sessions } from "@pensar/apex/core/session";
+import { runPentestAgent } from "@pensar/apex/core/api";
+```
+
+</Step>
+
+<Step title="Create a session">
+
+Sessions provide isolated workspaces for each assessment:
+
+```typescript src/example.ts
+const session = await sessions.create({
+  name: "Example API Security Test",
+  targets: ["https://api.example.com"],
+  config: {
+    scopeConstraints: {
+      strictScope: true,
+      allowedHosts: ["api.example.com"]
+    },
+    requestsPerSecond: 5  // Rate limiting
+  }
+});
+
+console.log("Session created:", session.id);
+console.log("Results will be saved to:", session.rootPath);
+```
+
+</Step>
+
+<Step title="Run the pentest agent">
+
+The pentest agent automatically:
+1. Discovers the attack surface (endpoints, pages, auth flows)
+2. Spawns targeted pentest agents for each discovered target
+3. Documents findings and generates proof-of-concept exploits
+
+```typescript src/example.ts
+const { findings, findingsPath, pocsPath } = await runPentestAgent({
+  target: "https://api.example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  callbacks: {
+    onTextDelta: (delta) => {
+      // Stream AI reasoning to console
+      process.stdout.write(delta.text);
+    },
+    onToolCall: (call) => {
+      console.log(`\n→ ${call.toolName}`);
+    },
+    onToolResult: (result) => {
+      console.log(`✓ ${result.toolName} completed`);
+    },
+    onError: (error) => {
+      console.error("Error:", error);
+    }
+  }
+});
+```
+
+</Step>
+
+<Step title="Process the results">
+
+Findings are returned as structured objects and saved to disk:
+
+```typescript src/example.ts
+console.log(`\n\nFound ${findings.length} vulnerabilities`);
+console.log(`Findings saved to: ${findingsPath}`);
+console.log(`POC scripts saved to: ${pocsPath}`);
+
+// Findings are typed objects
+findings.forEach((finding) => {
+  console.log(`\n[${finding.severity}] ${finding.title}`);
+  console.log(`Endpoint: ${finding.endpoint}`);
+  console.log(`Impact: ${finding.impact}`);
+  console.log(`POC: ${finding.pocPath}`);
+});
+```
+
+</Step>
+
+</Steps>
+
+## Complete Example
+
+Here's the full working example:
+
+```typescript src/pentest-example.ts
+import { sessions } from "@pensar/apex/core/session";
+import { runPentestAgent } from "@pensar/apex/core/api";
+
+async function runSecurityTest() {
+  // 1. Create a session
+  const session = await sessions.create({
+    name: "API Security Assessment",
+    targets: ["https://api.example.com"],
+    config: {
+      scopeConstraints: {
+        strictScope: true,
+        allowedHosts: ["api.example.com"]
+      },
+      requestsPerSecond: 5
+    }
+  });
+
+  console.log("Session:", session.id);
+
+  try {
+    // 2. Run the pentest
+    const { findings, findingsPath, pocsPath } = await runPentestAgent({
+      target: "https://api.example.com",
+      model: "claude-sonnet-4-20250514",
+      session,
+      callbacks: {
+        onTextDelta: (d) => process.stdout.write(d.text),
+        onToolCall: (c) => console.log(`\n→ ${c.toolName}`),
+        onToolResult: (r) => console.log(`✓ ${r.toolName}`),
+        onError: (e) => console.error("Error:", e)
+      }
+    });
+
+    // 3. Process results
+    console.log(`\n\nFound ${findings.length} vulnerabilities`);
+    console.log(`Results: ${findingsPath}`);
+    console.log(`POCs: ${pocsPath}`);
+
+    findings.forEach((finding) => {
+      console.log(`\n[${finding.severity}] ${finding.title}`);
+      console.log(`  Endpoint: ${finding.endpoint}`);
+      console.log(`  POC: ${finding.pocPath}`);
+    });
+  } catch (error) {
+    console.error("Pentest failed:", error);
+    process.exit(1);
+  }
+}
+
+runSecurityTest();
+```
+
+Run it with:
+
+```bash
+bun src/pentest-example.ts
+```
+
+## Agent-Specific Examples
+
+### Attack Surface Discovery (Blackbox)
+
+Discover endpoints, subdomains, and assets without source code access:
+
+```typescript
+import { runAttackSurfaceAgent } from "@pensar/apex/core/api";
+import { sessions } from "@pensar/apex/core/session";
+
+const session = await sessions.create({
+  name: "Attack Surface Discovery",
+  targets: ["https://example.com"],
+  config: {
+    enumerateSubdomains: true  // Enable DNS enumeration
+  }
+});
+
+const { results, targets } = await runAttackSurfaceAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text)
+  }
+});
+
+console.log(`\nDiscovered ${targets.length} targets`);
+targets.forEach((target) => {
+  console.log(`- ${target.target}: ${target.objective}`);
+});
+```
+
+### Attack Surface Discovery (Whitebox)
+
+Analyze source code directly to map endpoints:
+
+```typescript
+import { runAttackSurfaceAgent } from "@pensar/apex/core/api";
+
+const { results, targets } = await runAttackSurfaceAgent({
+  target: "https://example.com",
+  cwd: "/path/to/source/code",  // Enable whitebox mode
+  model: "claude-sonnet-4-20250514",
+  session,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text)
+  }
+});
+
+console.log(`\nAnalyzed codebase:`);
+console.log(`- ${results.summary.totalApiEndpoints} API endpoints`);
+console.log(`- ${results.summary.totalPages} pages`);
+```
+
+### Authentication Testing
+
+Test authentication mechanisms with credential management:
+
+```typescript
+import { runAuthenticationAgent } from "@pensar/apex/core/api";
+import { sessions } from "@pensar/apex/core/session";
+
+const session = await sessions.create({
+  name: "Auth Test",
+  targets: ["https://example.com"],
+  config: {
+    authCredentials: {
+      username: "testuser",
+      password: "testpass",
+      loginUrl: "https://example.com/login"
+    }
+  }
+});
+
+const result = await runAuthenticationAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text)
+  }
+});
+
+console.log(`\nAuthentication ${result.success ? "succeeded" : "failed"}`);
+console.log(`Strategy: ${result.strategy}`);
+console.log(`Cookies: ${result.exportedCookies}`);
+```
+
+<Note>
+**Credentials are secure**: The `username` and `password` are stored in memory only via `CredentialManager`. The AI model never sees raw secrets—only credential IDs that are resolved at tool execution time.
+</Note>
+
+### Targeted Pentest
+
+Test a specific endpoint with custom objectives:
+
+```typescript
+import { runTargetedPentestAgent } from "@pensar/apex/core/api";
+
+const { findings } = await runTargetedPentestAgent({
+  target: "https://api.example.com/users",
+  objectives: [
+    "Test for SQL injection",
+    "Check authentication bypass",
+    "Verify rate limiting"
+  ],
+  model: "claude-sonnet-4-20250514",
+  session
+});
+
+console.log(`Found ${findings.length} vulnerabilities`);
+```
+
+### Vulnerability Patching
+
+Automatically generate and validate security patches:
+
+```typescript
+import { runPatchingAgent } from "@pensar/apex/core/api";
+
+const result = await runPatchingAgent({
+  vulnerability: {
+    title: "SQL Injection in user search",
+    severity: "CRITICAL",
+    endpoint: "/api/users/search",
+    description: "Unparameterized SQL query allows injection"
+  },
+  codebasePath: "/path/to/source",
+  model: "claude-sonnet-4-20250514",
+  session
+});
+
+console.log(`\nPatch generated:`);
+console.log(`Files modified: ${result.filesModified}`);
+console.log(`Tests passed: ${result.testsPassed}`);
+```
+
+## TypeScript Support
+
+The API includes full TypeScript definitions for all functions and types:
+
+```typescript
+import type {
+  SessionInfo,
+  SessionConfig,
+  AuthCredentials,
+  Finding,
+  PentestWorkflowResult,
+  AttackSurfaceResult,
+  AuthenticationResult
+} from "@pensar/apex";
+
+// All agent inputs and results are fully typed
+const session: SessionInfo = await sessions.create({...});
+const result: PentestWorkflowResult = await runPentestAgent({...});
+```
+
+## Callback Types
+
+Callbacks are strongly typed for IDE autocomplete:
+
+```typescript
+import type { ConsumeCallbacks } from "@pensar/apex/core/agents/offSecAgent/types";
+
+const callbacks: ConsumeCallbacks = {
+  onTextDelta: (delta) => {
+    // delta.text is typed as string
+    process.stdout.write(delta.text);
+  },
+  onToolCall: (call) => {
+    // call.toolName is typed as the tool name
+    // call.args contains the tool arguments
+    console.log(`Calling ${call.toolName}`, call.args);
+  },
+  onToolResult: (result) => {
+    // result.result contains the tool output
+    console.log(`Result:`, result.result);
+  },
+  onError: (error) => {
+    // error is typed as unknown
+    console.error(error);
+  }
+};
+```
+
+## Aborting Long-Running Operations
+
+All agents support abort signals for graceful cancellation:
+
+```typescript
+const controller = new AbortController();
+
+// Cancel after 5 minutes
+setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+try {
+  await runPentestAgent({
+    target: "https://example.com",
+    model: "claude-sonnet-4-20250514",
+    session,
+    abortSignal: controller.signal
+  });
+} catch (error) {
+  if (error.name === "AbortError") {
+    console.log("Operation cancelled");
+  }
+}
+```
+
+## Error Handling
+
+Wrap agent calls in try-catch blocks for robust error handling:
+
+```typescript
+try {
+  const result = await runPentestAgent({...});
+  console.log("Success:", result.findings);
+} catch (error) {
+  if (error instanceof Error) {
+    console.error("Pentest failed:", error.message);
+    console.error(error.stack);
+  }
+  // Partial results may still be written to session.findingsPath
+  process.exit(1);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Agent Reference" icon="book" href="/api/agents">
+    Detailed documentation for each agent type
+  </Card>
+  <Card title="Configuration" icon="gear" href="/api/configuration">
+    Session config, credentials, and scope constraints
+  </Card>
+  <Card title="Findings Format" icon="file" href="/api/findings">
+    Structure of vulnerability findings and POCs
+  </Card>
+  <Card title="Examples" icon="code" href="/api/examples">
+    Real-world integration patterns
+  </Card>
+</CardGroup>

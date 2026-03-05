@@ -1,0 +1,192 @@
+---
+title: Introduction
+description: AI-powered penetration testing tool that enables you to use an AI agent to perform comprehensive blackbox and whitebox pentesting directly in your terminal
+---
+
+# Pensar Apex
+
+Pensar Apex is an **AI-powered penetration testing CLI tool** that enables security professionals to perform comprehensive blackbox and whitebox security assessments using advanced AI agents—directly from your terminal.
+
+<img src="/images/apex-screenshot.png" alt="Pensar Apex Terminal Interface" />
+
+## What is Pensar Apex?
+
+Pensar Apex combines the power of large language models with professional penetration testing methodologies to automate and enhance security assessments. It provides both an interactive Terminal User Interface (TUI) and command-line tools for running automated penetration tests.
+
+### Key Features
+
+<CardGroup cols={2}>
+  <Card title="AI-Driven Testing" icon="brain">
+    Leverages advanced AI models (Anthropic, OpenAI, AWS Bedrock, vLLM) to intelligently explore attack surfaces and discover vulnerabilities
+  </Card>
+  
+  <Card title="Blackbox & Whitebox" icon="code">
+    Supports both blackbox testing against live services and whitebox testing with source code access
+  </Card>
+  
+  <Card title="Attack Surface Discovery" icon="radar">
+    Automatically maps and analyzes your application's attack surface, identifying potential entry points
+  </Card>
+  
+  <Card title="Automated Exploitation" icon="bolt">
+    Generates proof-of-concept exploits and validates vulnerabilities automatically
+  </Card>
+  
+  <Card title="Comprehensive Reports" icon="file-text">
+    Produces detailed findings with PoCs, saved in structured JSON format for easy integration
+  </Card>
+  
+  <Card title="Interactive TUI" icon="terminal">
+    Beautiful terminal interface with real-time agent interactions and progress tracking
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+### Security Professionals
+
+- **Automated Pentesting**: Run comprehensive security assessments with minimal manual intervention
+- **Attack Surface Analysis**: Quickly map and understand application attack surfaces
+- **Vulnerability Research**: Discover and validate security vulnerabilities efficiently
+
+### Development Teams
+
+- **Security Testing**: Integrate into CI/CD pipelines for continuous security validation
+- **Code Review**: Perform whitebox analysis on source code to identify security issues
+- **Pre-deployment Checks**: Verify security posture before production deployments
+
+### Red Teams
+
+- **Reconnaissance**: Automate initial reconnaissance and attack surface mapping
+- **Exploit Development**: Generate PoCs for identified vulnerabilities
+- **Pivoting & Exfiltration**: Use exfil mode for advanced attack scenarios
+
+## Testing Modes
+
+<Tabs>
+  <Tab title="Blackbox Testing">
+    Test live web applications and services without access to source code:
+    
+    ```bash
+    pensar pentest --target https://example.com
+    ```
+    
+    - Network scanning and port enumeration
+    - Web application analysis
+    - Authentication testing
+    - Vulnerability discovery and exploitation
+  </Tab>
+  
+  <Tab title="Whitebox Testing">
+    Test applications with source code access for deeper analysis:
+    
+    ```bash
+    pensar pentest --target https://example.com --cwd /path/to/source
+    ```
+    
+    - Static code analysis
+    - Configuration review
+    - Dependency scanning
+    - Logic vulnerability detection
+  </Tab>
+  
+  <Tab title="Targeted Testing">
+    Focus on specific objectives or attack vectors:
+    
+    ```bash
+    pensar targeted-pentest --target https://example.com \
+      --objective "Test for SQL injection" \
+      --objective "Check authentication bypass"
+    ```
+    
+    - Custom testing objectives
+    - Focused vulnerability assessment
+    - Specific attack vector testing
+  </Tab>
+</Tabs>
+
+## AI Provider Support
+
+Pensar Apex supports multiple AI providers:
+
+- **Anthropic** (Claude models) - **Recommended** for best performance
+- **OpenAI** (GPT-4 and beyond)
+- **AWS Bedrock** (Multiple model access)
+- **OpenRouter** (Access to various models)
+- **vLLM** (Local model deployment)
+
+<Note>
+  **Anthropic models** provide the best performance and are recommended for optimal penetration testing results.
+</Note>
+
+## How It Works
+
+<Steps>
+  <Step title="Attack Surface Discovery">
+    Pensar Apex first analyzes your target to map out the attack surface—discovering endpoints, technologies, and potential entry points.
+  </Step>
+  
+  <Step title="Intelligent Testing">
+    AI agents systematically test discovered surfaces, applying penetration testing methodologies and security heuristics to identify vulnerabilities.
+  </Step>
+  
+  <Step title="Exploitation & Validation">
+    When vulnerabilities are discovered, the agent automatically attempts to exploit them and generates proof-of-concept code to validate the findings.
+  </Step>
+  
+  <Step title="Reporting">
+    All findings are documented with detailed descriptions, severity ratings, reproduction steps, and PoC code in structured JSON format.
+  </Step>
+</Steps>
+
+## Kali Linux Container
+
+For **optimal performance**, Pensar Apex includes a preconfigured Kali Linux container with all penetration testing tools installed:
+
+```bash
+cd container
+cp env.example .env  # Add your API keys
+docker compose up --build -d
+docker compose exec kali-apex bash
+```
+
+Inside the container:
+```bash
+pensar
+```
+
+<Warning>
+  On Linux hosts, consider using `network_mode: host` in `docker-compose.yml` for comprehensive network scanning capabilities.
+</Warning>
+
+## Responsible Use
+
+<Warning>
+  **This tool is for authorized security testing only.**
+  
+  You may only test systems you own or have explicit, written permission to test. Unauthorized testing of third-party systems is strictly prohibited and may be illegal.
+  
+  By using Pensar Apex, you agree to comply with all applicable laws and regulations governing security testing, privacy, and data access.
+</Warning>
+
+Before using Pensar Apex, please read the [Responsible Use Disclosure](https://github.com/pensarai/apex/blob/main/RESPONSIBLE_USE.md).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Pensar Apex on your system
+  </Card>
+  
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first penetration test
+  </Card>
+  
+  <Card title="GitHub Repository" icon="github" href="https://github.com/pensarai/apex">
+    View source code and contribute
+  </Card>
+  
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/pensar">
+    Join the community for support
+  </Card>
+</CardGroup>

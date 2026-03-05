@@ -1,0 +1,517 @@
+---
+title: 'doctor'
+description: 'Diagnose system configuration and install missing dependencies'
+---
+
+The `doctor` command checks your system configuration, verifies dependencies, and helps install missing tools required for penetration testing.
+
+## Syntax
+
+```bash
+pensar doctor
+```
+
+## Description
+
+Runs a comprehensive system check that verifies:
+
+- **System Tools**: Checks for required penetration testing tools (nmap, etc.)
+- **AI Providers**: Verifies API key configuration for AI models
+- **Dependencies**: Ensures all required system dependencies are available
+
+The doctor command can also offer to automatically install missing tools using your system's package manager.
+
+## No Options Required
+
+The `doctor` command runs without any flags or options. Simply execute:
+
+```bash
+pensar doctor
+```
+
+## Interactive Installation
+
+When the doctor finds missing tools, it can automatically install them:
+
+- **macOS**: Uses Homebrew (`brew`)
+- **Ubuntu/Debian**: Uses apt-get
+- **Fedora/RHEL**: Uses dnf
+- **Arch Linux**: Uses pacman
+
+You'll be prompted before any installation occurs.
+
+## Examples
+
+### Basic System Check
+
+Run a complete diagnostic:
+
+```bash
+pensar doctor
+```
+
+**Output**:
+```
+Pensar Doctor
+=============
+
+System Tools
+------------
+  ✓ nmap (Nmap version 7.94)
+
+AI Providers
+------------
+  ✓ Anthropic
+  · OpenAI
+  · OpenRouter
+  · AWS Bedrock
+  · AWS IAM
+  · vLLM (local)
+
+```
+
+### First-Time Setup
+
+When running on a fresh system:
+
+```bash
+$ pensar doctor
+
+Pensar Doctor
+=============
+
+System Tools
+------------
+  ✗ nmap — not found (recommended for network scanning)
+
+AI Providers
+------------
+  · Anthropic
+  · OpenAI
+  · OpenRouter
+  · AWS Bedrock
+  · AWS IAM
+  · vLLM (local)
+
+  No AI provider configured. Set at least one API key to get started:
+    export ANTHROPIC_API_KEY=your-key-here
+
+Install nmap via Homebrew? (brew install nmap) [y/N] y
+
+==> Downloading nmap...
+==> Installing nmap...
+
+✓ nmap installed successfully!
+```
+
+### Fully Configured System
+
+When everything is set up correctly:
+
+```bash
+$ pensar doctor
+
+Pensar Doctor
+=============
+
+System Tools
+------------
+  ✓ nmap (Nmap version 7.94)
+
+AI Providers
+------------
+  ✓ Anthropic
+  ✓ OpenAI
+  · OpenRouter
+  · AWS Bedrock
+  · AWS IAM
+  · vLLM (local)
+
+```
+
+### Missing API Keys
+
+When no AI provider is configured:
+
+```bash
+$ pensar doctor
+
+Pensar Doctor
+=============
+
+System Tools
+------------
+  ✓ nmap (Nmap version 7.94)
+
+AI Providers
+------------
+  · Anthropic
+  · OpenAI
+  · OpenRouter
+  · AWS Bedrock
+  · AWS IAM
+  · vLLM (local)
+
+  No AI provider configured. Set at least one API key to get started:
+    export ANTHROPIC_API_KEY=your-key-here
+
+```
+
+## Checked Components
+
+### System Tools
+
+<AccordionGroup>
+  <Accordion title="nmap" icon="network-wired">
+    **Purpose**: Network discovery and security scanning
+    
+    **Required**: Recommended (optional for basic usage)
+    
+    **Installation**:
+    ```bash
+    # macOS
+    brew install nmap
+    
+    # Ubuntu/Debian
+    sudo apt-get install nmap
+    
+    # Fedora/RHEL
+    sudo dnf install nmap
+    
+    # Arch
+    sudo pacman -S nmap
+    ```
+    
+    **Used for**:
+    - Port scanning
+    - Service detection
+    - Network reconnaissance
+  </Accordion>
+</AccordionGroup>
+
+### AI Providers
+
+The doctor checks for API keys for these providers:
+
+<AccordionGroup>
+  <Accordion title="Anthropic (Claude)" icon="brain" defaultOpen>
+    **Environment Variable**: `ANTHROPIC_API_KEY`
+    
+    **Models**:
+    - claude-sonnet-4-5 (recommended)
+    - claude-opus-4-0
+    - claude-3-5-sonnet
+    
+    **Get API Key**: https://console.anthropic.com/
+    
+    **Setup**:
+    ```bash
+    export ANTHROPIC_API_KEY="sk-ant-api03-..."
+    ```
+  </Accordion>
+  
+  <Accordion title="OpenAI (GPT)" icon="openai">
+    **Environment Variable**: `OPENAI_API_KEY`
+    
+    **Models**:
+    - gpt-4o
+    - gpt-4-turbo
+    - gpt-4
+    
+    **Get API Key**: https://platform.openai.com/api-keys
+    
+    **Setup**:
+    ```bash
+    export OPENAI_API_KEY="sk-proj-..."
+    ```
+  </Accordion>
+  
+  <Accordion title="OpenRouter" icon="route">
+    **Environment Variable**: `OPENROUTER_API_KEY`
+    
+    **Models**: Access to 100+ models from multiple providers
+    
+    **Get API Key**: https://openrouter.ai/keys
+    
+    **Setup**:
+    ```bash
+    export OPENROUTER_API_KEY="sk-or-v1-..."
+    ```
+  </Accordion>
+  
+  <Accordion title="AWS Bedrock" icon="aws">
+    **Environment Variable**: `BEDROCK_API_KEY`
+    
+    **Models**:
+    - Claude models via AWS
+    - Other AWS Bedrock models
+    
+    **Setup**:
+    ```bash
+    export BEDROCK_API_KEY="your-key"
+    ```
+  </Accordion>
+  
+  <Accordion title="AWS IAM" icon="key">
+    **Environment Variables**: 
+    - `AWS_ACCESS_KEY_ID`
+    - `AWS_SECRET_ACCESS_KEY`
+    
+    **Setup**:
+    ```bash
+    export AWS_ACCESS_KEY_ID="AKIA..."
+    export AWS_SECRET_ACCESS_KEY="..."
+    ```
+  </Accordion>
+  
+  <Accordion title="vLLM (Local)" icon="server">
+    **Environment Variable**: `LOCAL_MODEL_URL`
+    
+    **Purpose**: Use locally hosted models
+    
+    **Setup**:
+    ```bash
+    export LOCAL_MODEL_URL="http://localhost:8000/v1"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Status Indicators
+
+The doctor uses these indicators:
+
+| Icon | Meaning |
+|------|----------|
+| `✓` | Installed and configured |
+| `✗` | Missing or not found |
+| `·` | Not configured (optional) |
+
+## Exit Codes
+
+```bash
+pensar doctor
+echo $?  # Check exit code
+```
+
+| Code | Meaning |
+|------|----------|
+| `0` | Success - all checks passed |
+| `1` | Installation failed (if attempted) |
+
+<Note>
+  The doctor command always exits with code `0` unless an installation fails. Missing optional tools don't cause failures.
+</Note>
+
+## Use Cases
+
+### Pre-Pentest Verification
+
+Before running a pentest, verify your setup:
+
+```bash
+pensar doctor && pensar pentest --target https://example.com
+```
+
+### Troubleshooting
+
+If pentests fail, check configuration:
+
+```bash
+pensar doctor
+```
+
+Look for:
+- Missing nmap installation
+- No AI provider configured
+- Outdated tool versions
+
+### CI/CD Health Check
+
+Verify CI environment before automated testing:
+
+```bash
+#!/bin/bash
+set -e
+
+# Check configuration
+pensar doctor
+
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+  echo "Error: ANTHROPIC_API_KEY not set"
+  exit 1
+fi
+
+# Run pentest
+pensar pentest --target "$TARGET_URL"
+```
+
+### Fresh Installation
+
+After installing Pensar, run doctor to complete setup:
+
+```bash
+# Install Pensar
+curl -fsSL https://raw.githubusercontent.com/pensarai/apex/main/install.sh | sh
+
+# Run diagnostic and install dependencies
+pensar doctor
+
+# Configure AI provider
+export ANTHROPIC_API_KEY="your-key-here"
+
+# Verify
+pensar doctor
+```
+
+## Supported Package Managers
+
+The doctor automatically detects and uses your system's package manager:
+
+<Tabs>
+  <Tab title="macOS">
+    **Homebrew** (`brew`)
+    
+    ```bash
+    # Installation command used:
+    brew install nmap
+    ```
+    
+    **Prerequisites**:
+    - Homebrew must be installed
+    - Install from: https://brew.sh
+  </Tab>
+  
+  <Tab title="Ubuntu/Debian">
+    **APT** (`apt-get`)
+    
+    ```bash
+    # Installation command used:
+    sudo apt-get update && sudo apt-get install -y nmap
+    ```
+    
+    **Requires**: sudo privileges
+  </Tab>
+  
+  <Tab title="Fedora/RHEL">
+    **DNF** (`dnf`)
+    
+    ```bash
+    # Installation command used:
+    sudo dnf install -y nmap
+    ```
+    
+    **Requires**: sudo privileges
+  </Tab>
+  
+  <Tab title="Arch Linux">
+    **Pacman** (`pacman`)
+    
+    ```bash
+    # Installation command used:
+    sudo pacman -S --noconfirm nmap
+    ```
+    
+    **Requires**: sudo privileges
+  </Tab>
+</Tabs>
+
+## Manual Installation
+
+If automatic installation fails or is unavailable:
+
+### nmap
+
+**From source**:
+```bash
+# Download and build
+wget https://nmap.org/dist/nmap-7.94.tar.bz2
+tar xjf nmap-7.94.tar.bz2
+cd nmap-7.94
+./configure
+make
+sudo make install
+```
+
+**Official packages**: https://nmap.org/download.html
+
+## Troubleshooting
+
+### Package Manager Not Found
+
+If the doctor cannot detect a package manager:
+
+```
+No supported package manager found. Install nmap manually:
+  https://nmap.org/download.html
+```
+
+**Solution**: Install nmap manually using the link provided.
+
+### Permission Denied
+
+If installation fails with permission errors:
+
+```bash
+# Ensure sudo access
+sudo -v
+
+# Re-run doctor
+pensar doctor
+```
+
+### API Key Not Detected
+
+If you set an API key but doctor doesn't detect it:
+
+```bash
+# Verify the key is in your current shell:
+echo $ANTHROPIC_API_KEY
+
+# If empty, export it:
+export ANTHROPIC_API_KEY="your-key-here"
+
+# For permanent setup, add to shell profile:
+echo 'export ANTHROPIC_API_KEY="your-key-here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### nmap Version Issues
+
+If you have an old version of nmap:
+
+```bash
+# Check current version
+nmap --version
+
+# Update via package manager:
+brew upgrade nmap           # macOS
+sudo apt-get upgrade nmap   # Ubuntu
+```
+
+## Configuration Files
+
+The doctor reads configuration from:
+
+```
+~/.pensar/
+├── config.json          # User configuration
+└── logs/
+    └── doctor.log       # Diagnostic logs
+```
+
+## Related Commands
+
+- [pensar](/commands/pensar) - Launch TUI after verifying setup
+- [pentest](/commands/pentest) - Run pentest after verification
+- [upgrade](/commands/upgrade) - Update Pensar itself
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/getting-started">
+    Complete setup guide after running doctor
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Advanced configuration options
+  </Card>
+</CardGroup>

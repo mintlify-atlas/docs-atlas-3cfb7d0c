@@ -1,0 +1,690 @@
+---
+title: 'Authentication Testing'
+description: 'Configure and test authentication flows including OAuth, form-based login, and email verification'
+icon: 'key'
+---
+
+## Overview
+
+Pensar Apex includes a specialized **AuthenticationAgent** that handles complex authentication flows automatically. It supports:
+
+- **Form-based authentication** (username/password POST)
+- **JSON API authentication** (REST API login)
+- **HTTP Basic/Bearer authentication**
+- **OAuth 2.0 flows** (authorization code, implicit, device code)
+- **Browser-based authentication** (SPAs, JavaScript-rendered forms)
+- **Email verification** (automated inbox checking)
+- **Multi-factor authentication** (when possible)
+- **CSRF token handling**
+
+<Note>
+  The authentication agent operates **fully autonomously**—no human intervention required. It discovers login endpoints, handles redirects, extracts session cookies, and exports credentials for downstream testing.
+</Note>
+
+## Quick Start
+
+<Steps>
+  <Step title="Provide Credentials to Apex">
+    During session creation, pass authentication credentials:
+
+    ```typescript
+    const session = await sessions.create({
+      name: "Authenticated Pentest",
+      targets: ["https://app.example.com"],
+      config: {
+        authCredentials: {
+          loginUrl: "https://app.example.com/login",
+          username: "testuser@example.com",
+          password: "TestPassword123!",
+        },
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Run Authentication Agent">
+    ```typescript
+    import { runAuthenticationAgent } from "@pensar/apex";
+
+    const result = await runAuthenticationAgent({
+      target: "https://app.example.com",
+      model: "claude-sonnet-4-5",
+      session,
+    });
+
+    console.log(`Auth ${result.success ? "succeeded" : "failed"}: ${result.summary}`);
+    ```
+  </Step>
+
+  <Step title="Use Authenticated Session">
+    After successful authentication, the session contains exportable cookies and headers:
+
+    ```typescript
+    console.log("Cookies:", result.exportedCookies);
+    console.log("Headers:", result.exportedHeaders);
+    // Use these for authenticated requests in subsequent testing
+    ```
+  </Step>
+</Steps>
+
+## How Authentication Works
+
+### Credential Management
+
+Apex uses a **CredentialManager** to securely handle credentials without exposing raw passwords to the AI:
+
+```typescript
+// From src/core/agents/specialized/authenticationAgent/agent.ts
+const session = await sessions.create({
+  name: "Auth test",
+  targets: ["https://example.com"],
+  config: {
+    authCredentials: {
+      username: "admin",
+      password: "admin",
+      loginUrl: "https://example.com/login"
+    },
+  },
+});
+
+// Session auto-provisions a CredentialManager
+const prompt = session.credentialManager.formatForPrompt();
+// Prompt contains credential IDs, NOT raw passwords
+```
+
+When the agent needs to use credentials, it references them by ID:
+
+```typescript
+// From src/core/agents/offSecAgent/tools/authenticateSession.ts
+if (credentialId && ctx.credentialManager) {
+  const stored = ctx.credentialManager.resolve(credentialId);
+  username = stored.username;
+  password = stored.password;  // Resolved securely at execution time
+}
+```
+
+<Warning>
+  **The AI never sees raw passwords.** Credentials are resolved server-side during tool execution.
+</Warning>
+
+### Authentication Flow
+
+The AuthenticationAgent follows a deterministic strategy:
+
+<Steps>
+  <Step title="Detect Auth Mechanism">
+    If no `loginUrl` is provided, the agent probes the target:
+
+    ```bash
+    # Via execute_command tool
+    curl -i -s -o /dev/null -w "%{http_code}" https://target.com
+    ```
+
+    Indicators:
+    - **401/403** → API authentication
+    - **302 redirect to /login** → Form-based auth
+    - **WWW-Authenticate header** → HTTP Basic/Bearer
+    - **JSON error** → REST API auth
+  </Step>
+
+  <Step title="Attempt Authentication">
+    Based on detection, the agent tries:
+
+    **API Path:**
+    ```typescript
+    authenticate_session({
+      loginUrl: "https://example.com/api/login",
+      credentialId: "cred_xyz",  // Not raw password!
+      method: "json_post",
+      usernameField: "email",
+      passwordField: "password"
+    });
+    ```
+
+    **Browser Path (for SPAs/OAuth):**
+    ```typescript
+    browser_navigate({ url: "https://example.com/login" });
+    browser_snapshot();  // Get element refs
+    browser_fill({ ref: "e3", credentialId: "cred_xyz", credentialField: "username" });
+    browser_click({ ref: "e5" });  // Submit
+    browser_get_cookies();  // Extract session
+    ```
+  </Step>
+
+  <Step title="Validate Session">
+    After authentication, the agent validates the session:
+
+    ```bash
+    curl -H "Cookie: session=abc123" https://example.com/api/me
+    ```
+
+    If successful, returns user data. If 401, auth failed.
+  </Step>
+
+  <Step title="Export Credentials">
+    The agent calls `complete_authentication` to persist credentials:
+
+    ```typescript
+    complete_authentication({
+      success: true,
+      summary: "Successfully authenticated as user@example.com",
+      exportedCookies: "session=abc123; secure; httpOnly",
+      exportedHeaders: { "Authorization": "Bearer eyJhbGc..." },
+      strategy: "browser",
+    });
+    ```
+
+    This writes `auth-data.json` to the session directory for reuse.
+  </Step>
+</Steps>
+
+## Authentication Methods
+
+### Form-Based Authentication
+
+For traditional HTML login forms:
+
+```typescript
+const result = await runAuthenticationAgent({
+  target: "https://app.example.com",
+  model: "claude-sonnet-4-5",
+  session,
+  authHints: {
+    authScheme: "form",
+    browserRequired: false,  // Can use simple POST
+  },
+});
+```
+
+Apex will:
+1. POST credentials to the login form endpoint
+2. Extract session cookies from `Set-Cookie` headers
+3. Validate the session by making an authenticated request
+
+### JSON API Authentication
+
+For REST APIs:
+
+```typescript
+const session = await sessions.create({
+  name: "API Auth",
+  targets: ["https://api.example.com"],
+  config: {
+    authCredentials: {
+      loginUrl: "https://api.example.com/auth/login",
+      username: "user@example.com",
+      password: "password123",
+    },
+  },
+});
+```
+
+Apex will:
+1. POST JSON: `{"email": "user@example.com", "password": "password123"}`
+2. Extract bearer token from response: `{"token": "eyJhbGc..."}`
+3. Export header: `{"Authorization": "Bearer eyJhbGc..."}`
+
+### Browser-Based Authentication (SPAs)
+
+For single-page apps with JavaScript-rendered forms:
+
+```typescript
+const result = await runAuthenticationAgent({
+  target: "https://spa.example.com",
+  model: "claude-sonnet-4-5",
+  session,
+  authHints: {
+    authScheme: "form",
+    browserRequired: true,  // Must use browser automation
+  },
+});
+```
+
+Apex will:
+1. Launch a headless browser with Playwright
+2. Navigate to the login page
+3. Fill the form fields using accessibility tree refs
+4. Click the submit button
+5. Extract cookies (including httpOnly)
+6. Extract tokens from `localStorage`/`sessionStorage`
+
+<Note>
+  Browser automation is **automatic**—Apex detects when JavaScript rendering is required.
+</Note>
+
+### OAuth 2.0 Flows
+
+For OAuth providers:
+
+```typescript
+const result = await runAuthenticationAgent({
+  target: "https://app.example.com",
+  model: "claude-sonnet-4-5",
+  session,
+  authHints: {
+    authScheme: "oauth",
+    browserRequired: true,
+  },
+});
+```
+
+Apex will:
+1. Navigate to the OAuth authorization URL
+2. Fill consent form if needed
+3. Handle redirect back to the app
+4. Extract authorization code from URL
+5. Exchange code for access token
+6. Export bearer token for API requests
+
+<Warning>
+  OAuth consent barriers (like "Allow access?") are handled automatically when possible. If a CAPTCHA is present, the agent will report failure.
+</Warning>
+
+### Email Verification
+
+For flows that require email confirmation:
+
+```typescript
+const session = await sessions.create({
+  name: "Email Verification Test",
+  targets: ["https://app.example.com"],
+  config: {
+    authCredentials: {
+      loginUrl: "https://app.example.com/register",
+      username: "test@example.com",
+      password: "TestPass123!",
+    },
+    emailInboxes: [
+      {
+        address: "test@example.com",
+        type: "gmail",
+        accessToken: process.env.GMAIL_ACCESS_TOKEN,
+        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+        clientId: process.env.GMAIL_CLIENT_ID,
+        clientSecret: process.env.GMAIL_CLIENT_SECRET,
+      },
+    ],
+  },
+});
+```
+
+Apex will:
+1. Register a new account
+2. Use `email_search_messages` to find the verification email
+3. Extract the verification link from the email body
+4. Navigate to the link to confirm the account
+5. Log in with the verified credentials
+
+<Note>
+  Email verification is **fully automated** using the Gmail or Outlook adapter. See [Email Tools](#email-verification-tools) below.
+</Note>
+
+## Authentication Tools
+
+The AuthenticationAgent has access to these specialized tools:
+
+### API Authentication
+
+#### `authenticate_session`
+
+Performs credential-based authentication:
+
+```typescript
+authenticate_session({
+  loginUrl: "https://example.com/api/login",
+  credentialId: "cred_xyz",  // References stored credential
+  method: "json_post",        // or "form_post", "basic_auth"
+  usernameField: "email",
+  passwordField: "password",
+  additionalFields: { "remember": "true" }  // Optional extra fields
+});
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "authenticated": true,
+  "sessionCookie": "session=abc123; Secure; HttpOnly",
+  "statusCode": 200,
+  "message": "Successfully authenticated as user@example.com"
+}
+```
+
+### Browser Authentication
+
+#### `browser_navigate`
+
+Loads a page in the headless browser:
+
+```typescript
+browser_navigate({ url: "https://example.com/login" });
+```
+
+#### `browser_snapshot`
+
+Captures the accessibility tree with element refs:
+
+```typescript
+browser_snapshot();
+// Returns:
+// textbox "Email" [ref=e3]
+// textbox "Password" [ref=e5] (password)
+// button "Sign in" [ref=e7]
+```
+
+<Warning>
+  **Always call `browser_snapshot` before `browser_fill` or `browser_click`** to get fresh element refs.
+</Warning>
+
+#### `browser_fill`
+
+Fills a form field using its ref:
+
+```typescript
+browser_fill({
+  ref: "e3",              // From browser_snapshot
+  credentialId: "cred_xyz",
+  credentialField: "username"  // Or "password"
+});
+```
+
+The credential is resolved securely—**the AI never sees the raw value**.
+
+#### `browser_click`
+
+Clicks a button or link:
+
+```typescript
+browser_click({ ref: "e7" });
+```
+
+#### `browser_get_cookies`
+
+Extracts all cookies (including httpOnly):
+
+```typescript
+browser_get_cookies();
+// Returns:
+// {
+//   "cookies": [{"name": "session", "value": "abc123", "httpOnly": true}],
+//   "cookieHeader": "session=abc123"
+// }
+```
+
+#### `browser_evaluate`
+
+Runs JavaScript to extract tokens:
+
+```typescript
+browser_evaluate({
+  script: `
+    (() => {
+      const tokens = {};
+      ['token', 'access_token', 'jwt'].forEach(key => {
+        const val = localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (val) tokens[key] = val;
+      });
+      return JSON.stringify(tokens);
+    })()
+  `
+});
+// Returns: {"access_token": "eyJhbGc..."}
+```
+
+### Email Verification Tools
+
+When `emailInboxes` are configured in the session:
+
+#### `email_list_inboxes`
+
+Lists available email inboxes:
+
+```typescript
+email_list_inboxes();
+// Returns: [{"address": "test@example.com", "type": "gmail"}]
+```
+
+#### `email_search_messages`
+
+Searches for emails matching a query:
+
+```typescript
+email_search_messages({
+  inbox: "test@example.com",
+  query: "subject:Verify your email",
+  since: new Date(Date.now() - 60000)  // Last 1 minute
+});
+```
+
+#### `email_get_message`
+
+Fetches full email content:
+
+```typescript
+email_get_message({
+  inbox: "test@example.com",
+  messageId: "msg_123"
+});
+// Returns:
+// {
+//   "subject": "Verify your email",
+//   "bodyText": "Click here to verify: https://example.com/verify?token=abc123",
+//   "bodyHtml": "<a href='https://example.com/verify?token=abc123'>Verify</a>"
+// }
+```
+
+### Completion Tools
+
+#### `complete_authentication`
+
+Persists authentication data for downstream agents:
+
+```typescript
+complete_authentication({
+  success: true,
+  summary: "Successfully authenticated via OAuth",
+  exportedCookies: "session=abc123; Secure; HttpOnly",
+  exportedHeaders: { "Authorization": "Bearer eyJhbGc..." },
+  strategy: "oauth",
+  authBarrier: undefined  // Or {type: "captcha", reason: "..."}
+});
+```
+
+This writes `~/.pensar/sessions/<session>/auth/auth-data.json`:
+
+```json
+{
+  "authenticated": true,
+  "summary": "Successfully authenticated via OAuth",
+  "cookies": "session=abc123; Secure; HttpOnly",
+  "headers": { "Authorization": "Bearer eyJhbGc..." },
+  "strategy": "oauth",
+  "timestamp": "2026-03-05T12:00:00.000Z"
+}
+```
+
+## Auth Barriers
+
+The agent detects and reports authentication barriers:
+
+| Barrier Type | Description | Example |
+|--------------|-------------|----------|
+| **captcha** | CAPTCHA challenge present | reCAPTCHA, hCaptcha |
+| **mfa** | Multi-factor authentication required | SMS code, TOTP |
+| **oauth_consent** | OAuth consent screen | "Allow XYZ to access your account?" |
+| **email_verification** | Email confirmation required | "Check your inbox to verify" |
+| **phone_verification** | Phone number verification | SMS code to phone |
+
+When a barrier is encountered:
+
+```typescript
+const result = await runAuthenticationAgent({...});
+
+if (!result.success && result.authBarrier) {
+  console.log(`Auth failed: ${result.authBarrier.type}`);
+  console.log(`Reason: ${result.authBarrier.reason}`);
+}
+```
+
+<Note>
+  **CAPTCHA and MFA are reported as failures**—Apex operates autonomously and cannot solve human challenges.
+</Note>
+
+## Best Practices
+
+### 1. Use Credential Manager (Automatic)
+
+Always provide credentials via `authCredentials` in the session config:
+
+```typescript
+// ✅ Good: Credentials are managed securely
+const session = await sessions.create({
+  config: {
+    authCredentials: {
+      loginUrl: "https://example.com/login",
+      username: "user@example.com",
+      password: "pass123",
+    },
+  },
+});
+
+// ❌ Bad: Don't pass raw passwords to the agent prompt
+const prompt = `Log in with username: user@example.com, password: pass123`;
+```
+
+### 2. Provide Auth Hints
+
+Help the agent by providing hints when known:
+
+```typescript
+await runAuthenticationAgent({
+  target: "https://app.example.com",
+  model: "claude-sonnet-4-5",
+  session,
+  authHints: {
+    authScheme: "oauth",           // Type of auth
+    browserRequired: true,          // Needs browser automation
+    csrfRequired: true,             // CSRF token needed
+    protectedEndpoints: [           // Test these after auth
+      "https://app.example.com/api/me",
+      "https://app.example.com/dashboard",
+    ],
+  },
+});
+```
+
+### 3. Review Auth Data
+
+After successful authentication, review the exported data:
+
+```bash
+cat ~/.pensar/sessions/<session>/auth/auth-data.json
+```
+
+Ensure:
+- Cookies are present and valid
+- Headers include bearer tokens if needed
+- Strategy matches the expected auth method
+
+### 4. Test Authenticated Endpoints
+
+Use the exported credentials for subsequent testing:
+
+```typescript
+const authData = JSON.parse(
+  fs.readFileSync("~/.pensar/sessions/<session>/auth/auth-data.json")
+);
+
+const response = await fetch("https://example.com/api/protected", {
+  headers: {
+    Cookie: authData.cookies,
+    ...authData.headers,
+  },
+});
+```
+
+## Examples
+
+### Testing OAuth Flow
+
+```typescript
+const session = await sessions.create({
+  name: "OAuth Test",
+  targets: ["https://app.example.com"],
+  config: {
+    authCredentials: {
+      username: "user@example.com",
+      password: "pass123",
+    },
+  },
+});
+
+const result = await runAuthenticationAgent({
+  target: "https://app.example.com",
+  model: "claude-sonnet-4-5",
+  session,
+  authHints: {
+    authScheme: "oauth",
+    browserRequired: true,
+    protectedEndpoints: ["https://app.example.com/api/me"],
+  },
+});
+
+console.log(`OAuth auth: ${result.success ? "success" : "failed"}`);
+console.log(`Bearer token: ${result.exportedHeaders.Authorization}`);
+```
+
+### Testing Email Verification
+
+```typescript
+const session = await sessions.create({
+  name: "Email Verification Test",
+  targets: ["https://app.example.com"],
+  config: {
+    authCredentials: {
+      loginUrl: "https://app.example.com/register",
+      username: "test+automation@example.com",
+      password: "TestPass123!",
+    },
+    emailInboxes: [
+      {
+        address: "test+automation@example.com",
+        type: "gmail",
+        accessToken: process.env.GMAIL_ACCESS_TOKEN,
+        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+        clientId: process.env.GMAIL_CLIENT_ID,
+        clientSecret: process.env.GMAIL_CLIENT_SECRET,
+      },
+    ],
+  },
+});
+
+const result = await runAuthenticationAgent({
+  target: "https://app.example.com",
+  model: "claude-sonnet-4-5",
+  session,
+});
+
+if (result.success) {
+  console.log("Account registered and verified!");
+  console.log("Session cookie:", result.exportedCookies);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Testing" icon="shield-halved" href="/guides/blackbox-testing">
+    Test authenticated endpoints with blackbox testing
+  </Card>
+  <Card title="Whitebox Testing" icon="code" href="/guides/whitebox-testing">
+    Analyze authentication logic in source code
+  </Card>
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Run authenticated tests in the Kali container
+  </Card>
+  <Card title="vLLM Setup" icon="server" href="/guides/vllm-setup">
+    Use local models for authentication testing
+  </Card>
+</CardGroup>

@@ -1,0 +1,330 @@
+---
+title: "AI Providers"
+description: "Configure Anthropic, OpenAI, AWS Bedrock, OpenRouter, and local vLLM models for Pensar Apex"
+---
+
+Pensar Apex supports multiple AI providers. **Anthropic models provide the best performance** and are recommended for optimal results.
+
+## Supported Providers
+
+Pensar Apex integrates with the following AI providers:
+
+<CardGroup cols={2}>
+  <Card title="Anthropic" icon="a" href="#anthropic-claude">
+    Recommended provider with best pentesting performance
+  </Card>
+  <Card title="OpenAI" icon="robot" href="#openai">
+    GPT-4 and other OpenAI models
+  </Card>
+  <Card title="AWS Bedrock" icon="aws" href="#aws-bedrock">
+    Enterprise-grade AI on AWS infrastructure
+  </Card>
+  <Card title="OpenRouter" icon="route" href="#openrouter">
+    Unified API for multiple model providers
+  </Card>
+  <Card title="vLLM (Local)" icon="server" href="#vllm-local-models">
+    Self-hosted open-source models
+  </Card>
+</CardGroup>
+
+## Configuration Methods
+
+You can configure AI providers in two ways:
+
+1. **Environment Variables** (recommended for CLI usage)
+2. **TUI Configuration** (interactive setup)
+
+<Note>
+Environment variables take precedence over TUI configuration. This allows you to override settings per-session.
+</Note>
+
+## Anthropic (Claude)
+
+**Recommended** for best penetration testing performance.
+
+### Setup
+
+<Steps>
+  <Step title="Get API Key">
+    Sign up at [console.anthropic.com](https://console.anthropic.com) and create an API key.
+  </Step>
+
+  <Step title="Set Environment Variable">
+    ```bash
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    ```
+  </Step>
+
+  <Step title="Verify Configuration">
+    ```bash
+    pensar doctor
+    ```
+
+    You should see:
+    ```
+    ✓ Anthropic API key configured
+    ```
+  </Step>
+</Steps>
+
+### Recommended Models
+
+- `claude-sonnet-4-5` (default) - Best balance of performance and cost
+- `claude-opus-4` - Maximum reasoning capability for complex targets
+- `claude-sonnet-3-5` - Previous generation, still highly capable
+
+<Tip>
+For most pentesting scenarios, `claude-sonnet-4-5` provides excellent results at reasonable cost.
+</Tip>
+
+## OpenAI
+
+Supports GPT-4 and other OpenAI models.
+
+### Setup
+
+<Steps>
+  <Step title="Get API Key">
+    Create an API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+  </Step>
+
+  <Step title="Set Environment Variable">
+    ```bash
+    export OPENAI_API_KEY="sk-..."
+    ```
+  </Step>
+
+  <Step title="Select Model">
+    When launching pentest, specify the model:
+    ```bash
+    pensar pentest --target https://example.com --model gpt-4
+    ```
+  </Step>
+</Steps>
+
+### Available Models
+
+- `gpt-4` - Most capable GPT model
+- `gpt-4-turbo` - Faster, cost-effective alternative
+- `gpt-3.5-turbo` - Budget option (not recommended for complex pentesting)
+
+<Warning>
+GPT models may not perform as well as Claude for security testing tasks. Use Anthropic when possible.
+</Warning>
+
+## AWS Bedrock
+
+Run models on AWS infrastructure with enterprise-grade security and compliance.
+
+### Authentication Methods
+
+Bedrock supports two authentication modes:
+
+<Tabs>
+  <Tab title="Bearer Token">
+    Simple token-based auth:
+
+    ```bash
+    export BEDROCK_API_KEY="your-bearer-token"
+    export AWS_REGION="us-east-1"
+    ```
+  </Tab>
+
+  <Tab title="IAM Credentials">
+    Use IAM credentials (recommended for production):
+
+    ```bash
+    export AWS_ACCESS_KEY_ID="AKIA..."
+    export AWS_SECRET_ACCESS_KEY="..."
+    export AWS_SESSION_TOKEN="..."  # optional, for temporary credentials
+    export AWS_REGION="us-east-1"
+    ```
+  </Tab>
+</Tabs>
+
+### Supported Models
+
+Bedrock provides access to Claude, Llama, and other models:
+
+```bash
+# Use Claude on Bedrock
+pensar pentest --target https://example.com --model anthropic.claude-sonnet-4-5
+
+# Use Llama on Bedrock
+pensar pentest --target https://example.com --model meta.llama3-70b
+```
+
+<Note>
+Model IDs on Bedrock may differ from direct provider APIs. Check the [AWS Bedrock documentation](https://docs.aws.amazon.com/bedrock/) for available models in your region.
+</Note>
+
+## OpenRouter
+
+Unified API for accessing models from multiple providers (Anthropic, OpenAI, Google, Meta, etc.).
+
+### Setup
+
+<Steps>
+  <Step title="Get API Key">
+    Sign up at [openrouter.ai](https://openrouter.ai) and create an API key.
+  </Step>
+
+  <Step title="Set Environment Variable">
+    ```bash
+    export OPENROUTER_API_KEY="sk-or-..."
+    ```
+  </Step>
+
+  <Step title="Select Model">
+    ```bash
+    pensar pentest --target https://example.com --model anthropic/claude-sonnet-4-5
+    ```
+  </Step>
+</Steps>
+
+### Model Format
+
+OpenRouter uses `provider/model-id` format:
+
+- `anthropic/claude-sonnet-4-5`
+- `openai/gpt-4`
+- `google/gemini-pro`
+- `meta-llama/llama-3-70b`
+
+See [openrouter.ai/models](https://openrouter.ai/models) for all available models.
+
+## vLLM (Local Models)
+
+Run open-source models locally with vLLM for complete data privacy.
+
+### Setup
+
+<Steps>
+  <Step title="Start vLLM Server">
+    ```bash
+    # Install vLLM
+    pip install vllm
+
+    # Start server with a model
+    vllm serve meta-llama/Llama-3.1-70B-Instruct --port 8000
+    ```
+  </Step>
+
+  <Step title="Configure Pensar Apex">
+    Set the local model endpoint:
+    ```bash
+    export LOCAL_MODEL_URL="http://localhost:8000/v1"
+    ```
+  </Step>
+
+  <Step title="Specify Model Name">
+    In the TUI, go to Models screen and enter the model name in "Custom local model (vLLM)" input.
+
+    Or via CLI:
+    ```bash
+    pensar pentest --target https://example.com --model meta-llama/Llama-3.1-70B-Instruct
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Local models may not perform as well as Claude for pentesting. Use for offline scenarios or when data privacy is critical.
+</Warning>
+
+See the [vLLM Setup Guide](/guides/vllm-setup) for detailed instructions.
+
+## Provider Priority
+
+When multiple providers are configured, Pensar Apex checks for API keys in this order:
+
+1. `ANTHROPIC_API_KEY` (Anthropic)
+2. `OPENAI_API_KEY` (OpenAI)
+3. `OPENROUTER_API_KEY` (OpenRouter)
+4. `BEDROCK_API_KEY` or AWS credentials (Bedrock)
+5. `LOCAL_MODEL_URL` (vLLM)
+
+<Tip>
+You can override the default by explicitly specifying `--model` on the command line.
+</Tip>
+
+## Configuration File
+
+AI provider settings are stored in `~/.pensar/config.json`:
+
+```json
+{
+  "anthropicAPIKey": "sk-ant-...",
+  "openAiAPIKey": null,
+  "openRouterAPIKey": null,
+  "bedrockAPIKey": null,
+  "localModelUrl": null,
+  "localModelName": null,
+  "selectedModelId": "claude-sonnet-4-5",
+  "responsibleUseAccepted": true
+}
+```
+
+<Warning>
+Environment variables always take precedence over config file values.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="'No AI provider configured' error">
+    Ensure at least one AI provider API key is set:
+
+    ```bash
+    # Check current config
+    pensar doctor
+
+    # Set API key
+    export ANTHROPIC_API_KEY="your-key"
+    ```
+  </Accordion>
+
+  <Accordion title="Rate limit errors">
+    Pensar Apex automatically retries on rate limits. If you hit persistent rate limits:
+
+    - **Anthropic**: Upgrade your plan tier at [console.anthropic.com](https://console.anthropic.com)
+    - **OpenAI**: Check usage limits at [platform.openai.com/account/limits](https://platform.openai.com/account/limits)
+    - **Bedrock**: Request quota increases in AWS Service Quotas
+  </Accordion>
+
+  <Accordion title="vLLM connection failed">
+    Verify the vLLM server is running:
+
+    ```bash
+    curl http://localhost:8000/v1/models
+    ```
+
+    If this fails, ensure vLLM is started and accessible.
+  </Accordion>
+
+  <Accordion title="AWS Bedrock authentication failed">
+    For IAM credentials, verify:
+
+    ```bash
+    aws sts get-caller-identity
+    ```
+
+    Ensure your IAM user/role has `bedrock:InvokeModel` permission.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Selection" icon="sliders" href="/configuration/models">
+    Choose the right model for your testing needs
+  </Card>
+  <Card title="Environment Variables" icon="terminal" href="/configuration/environment-variables">
+    Complete reference of all configuration options
+  </Card>
+  <Card title="vLLM Setup" icon="server" href="/guides/vllm-setup">
+    Detailed guide to self-hosting models
+  </Card>
+  <Card title="Run First Pentest" icon="rocket" href="/quickstart">
+    Start testing with your configured provider
+  </Card>
+</CardGroup>

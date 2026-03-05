@@ -1,0 +1,465 @@
+---
+title: "Attack Surface Agents"
+description: "Specialized agents for reconnaissance and attack surface analysis"
+---
+
+## Overview
+
+Attack surface agents are recon-focused specializations of the `OffensiveSecurityAgent` that map the entire attack surface of a target. They discover assets, endpoints, authentication flows, and produce a structured list of targets for deep penetration testing.
+
+## BlackboxAttackSurfaceAgent
+
+Maps the entire attack surface of a target through blackbox reconnaissance — discovers assets, endpoints, authentication flows, and produces a list of targets for deep testing.
+
+### Constructor
+
+```typescript
+new BlackboxAttackSurfaceAgent(opts: AttackSurfaceAgentInput)
+```
+
+<ParamField path="opts" type="AttackSurfaceAgentInput" required>
+  Configuration object for the attack surface agent
+</ParamField>
+
+### AttackSurfaceAgentInput
+
+<ParamField path="model" type="AIModel" required>
+  AI model identifier (e.g., `"claude-sonnet-4-20250514"`)
+</ParamField>
+
+<ParamField path="session" type="SessionInfo" required>
+  Session providing paths for findings, POCs, logs, etc.
+</ParamField>
+
+<ParamField path="target" type="string">
+  The target to analyze (domain, IP, URL, network range, or org name). Either `target` or `cwd` must be provided.
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Working directory for source-code based analysis. Either `target` or `cwd` must be provided.
+</ParamField>
+
+<ParamField path="authConfig" type="AIAuthConfig">
+  Optional per-provider API key overrides
+</ParamField>
+
+<ParamField path="onStepFinish" type="StreamTextOnStepFinishCallback<ToolSet>">
+  Callback fired after each agent step
+</ParamField>
+
+<ParamField path="abortSignal" type="AbortSignal">
+  AbortSignal to cancel the agent mid-run
+</ParamField>
+
+<ParamField path="callbacks" type="ConsumeCallbacks">
+  Callbacks for stream events and subagent forwarding
+</ParamField>
+
+<ParamField path="findingsRegistry" type="FindingsRegistry">
+  Shared findings registry for cross-agent dedup
+</ParamField>
+
+<ParamField path="credentialManager" type="CredentialManager">
+  In-memory credential store for secret-free agent prompts
+</ParamField>
+
+<ParamField path="stopWhen" type="StopCondition<ToolSet>">
+  Override the default stop condition
+</ParamField>
+
+### Result Type
+
+The `consume()` method returns an `AttackSurfaceResult`:
+
+<ResponseField name="results" type="AttackSurfaceAnalysisResults | null">
+  The full analysis results (targets, assets, key findings)
+</ResponseField>
+
+<ResponseField name="targets" type="PentestTarget[]">
+  All targets identified for deep penetration testing
+</ResponseField>
+
+<ResponseField name="resultsPath" type="string">
+  Absolute path to the attack-surface-results.json file
+</ResponseField>
+
+<ResponseField name="assetsPath" type="string">
+  Absolute path to the session's assets directory
+</ResponseField>
+
+### AttackSurfaceAnalysisResults
+
+<ResponseField name="summary" type="AttackSurfaceSummary">
+  High-level summary of the analysis
+  
+  <ParamField path="totalAssets" type="number">
+    Total number of assets discovered
+  </ParamField>
+  
+  <ParamField path="totalDomains" type="number">
+    Total number of domains/subdomains found
+  </ParamField>
+  
+  <ParamField path="highValueTargets" type="number">
+    Number of high-priority targets identified
+  </ParamField>
+  
+  <ParamField path="analysisComplete" type="boolean">
+    Whether the analysis completed successfully
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="discoveredAssets" type="string[]">
+  Array of discovered asset strings (e.g., "example.com - Web server (nginx) - Ports 80,443")
+</ResponseField>
+
+<ResponseField name="targets" type="PentestTarget[]">
+  Structured targets for deep testing
+  
+  <ParamField path="target" type="string">
+    Target URL or endpoint
+  </ParamField>
+  
+  <ParamField path="objective" type="string">
+    Testing objective for this target
+  </ParamField>
+  
+  <ParamField path="rationale" type="string">
+    Why this target was selected
+  </ParamField>
+  
+  <ParamField path="authenticationInfo" type="AuthenticationInfo">
+    Authentication details if required
+    
+    <ParamField path="method" type="string">
+      Authentication method (e.g., "cookie", "bearer")
+    </ParamField>
+    
+    <ParamField path="details" type="string">
+      Details about the auth mechanism
+    </ParamField>
+    
+    <ParamField path="credentials" type="string">
+      Credential reference or ID
+    </ParamField>
+    
+    <ParamField path="cookies" type="string">
+      Cookie string if using cookie auth
+    </ParamField>
+    
+    <ParamField path="headers" type="string">
+      Additional headers required
+    </ParamField>
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="keyFindings" type="string[]">
+  Array of key findings from the analysis (e.g., "[HIGH] Admin panel exposed - admin.example.com")
+</ResponseField>
+
+### Active Tools
+
+The BlackboxAttackSurfaceAgent uses the following tools:
+
+- `execute_command` - Run reconnaissance commands (nmap, dig, curl, etc.)
+- `document_asset` - Document discovered assets
+- `create_attack_surface_report` - Generate the final analysis report
+- `browser_navigate` - Navigate to web pages
+- `browser_snapshot` - Capture DOM snapshots
+- `browser_screenshot` - Take screenshots for documentation
+- `browser_click` - Interact with page elements
+- `browser_fill` - Fill form fields
+- `browser_evaluate` - Execute JavaScript in the browser context
+- `browser_console` - Access browser console logs
+- `browser_get_cookies` - Extract cookies from browser
+- `email_list_inboxes` - List available email inboxes (if configured)
+- `email_list_messages` - List messages in an inbox
+- `email_search_messages` - Search for specific messages
+- `email_get_message` - Retrieve full message content
+
+## Usage Examples
+
+### Basic Attack Surface Analysis
+
+```typescript
+import { BlackboxAttackSurfaceAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+
+const session = await createSession({
+  name: "Example.com Recon",
+  targets: ["https://example.com"],
+});
+
+const agent = new BlackboxAttackSurfaceAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+const { targets, results, resultsPath } = await agent.consume({
+  onTextDelta: (delta) => {
+    process.stdout.write(delta.text);
+  },
+  onToolCall: (delta) => {
+    console.log(`→ ${delta.toolName}`);
+  },
+});
+
+console.log(`\nIdentified ${targets.length} targets for deep testing`);
+console.log(`Results saved to: ${resultsPath}`);
+
+// Access structured results
+if (results) {
+  console.log(`Total assets: ${results.summary.totalAssets}`);
+  console.log(`Total domains: ${results.summary.totalDomains}`);
+  console.log(`High-value targets: ${results.summary.highValueTargets}`);
+}
+```
+
+### With Authentication Credentials
+
+```typescript
+import { BlackboxAttackSurfaceAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+import { CredentialManager } from "@pensar/apex/credentials";
+
+const credentialManager = new CredentialManager();
+credentialManager.addCredential({
+  id: "admin_creds",
+  username: "admin@example.com",
+  password: "secure_password",
+  loginUrl: "https://example.com/login",
+  role: "admin",
+});
+
+const session = await createSession({
+  name: "Authenticated Recon",
+  targets: ["https://example.com"],
+  credentialManager,
+});
+
+const agent = new BlackboxAttackSurfaceAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  credentialManager,
+});
+
+const { targets, results } = await agent.consume({
+  onTextDelta: (delta) => process.stdout.write(delta.text),
+});
+
+console.log(`Found ${targets.length} authenticated targets`);
+```
+
+### With Custom Configuration
+
+```typescript
+import { BlackboxAttackSurfaceAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+
+const session = await createSession({
+  name: "Custom Recon",
+  targets: ["https://example.com"],
+  config: {
+    scopeConstraints: {
+      strictScope: true, // Only test allowed hosts
+    },
+    enumerateSubdomains: true, // Enable subdomain enumeration
+    authenticationInstructions: "Use OAuth flow with Google Sign-In",
+  },
+});
+
+const agent = new BlackboxAttackSurfaceAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+const { targets, results } = await agent.consume({
+  onTextDelta: (delta) => process.stdout.write(delta.text),
+});
+```
+
+### Processing Results
+
+```typescript
+import { BlackboxAttackSurfaceAgent } from "@pensar/apex";
+import { 
+  parseDiscoveredAsset, 
+  parseKeyFinding,
+  getHighPriorityKeywords 
+} from "@pensar/apex/agents/specialized/attackSurface";
+
+const agent = new BlackboxAttackSurfaceAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+const { results } = await agent.consume();
+
+if (results) {
+  // Parse discovered assets
+  const parsedAssets = results.discoveredAssets.map(parseDiscoveredAsset);
+  console.log("Assets:", parsedAssets);
+
+  // Parse key findings
+  const findings = results.keyFindings.map(parseKeyFinding);
+  const criticalFindings = findings.filter(f => f.severity === "CRITICAL");
+  console.log("Critical findings:", criticalFindings);
+
+  // Get high-priority targets
+  const highPriority = getHighPriorityKeywords(results);
+  console.log("High-priority items:", highPriority);
+
+  // Process targets for pentest agents
+  for (const target of results.targets) {
+    console.log(`\nTarget: ${target.target}`);
+    console.log(`Objective: ${target.objective}`);
+    console.log(`Rationale: ${target.rationale}`);
+    
+    if (target.authenticationInfo) {
+      console.log(`Auth method: ${target.authenticationInfo.method}`);
+    }
+  }
+}
+```
+
+### Loading Previous Results
+
+```typescript
+import { loadAttackSurfaceResults } from "@pensar/apex/agents/specialized/attackSurface";
+import { join } from "path";
+
+const resultsPath = join(session.rootPath, "attack-surface-results.json");
+const results = loadAttackSurfaceResults(resultsPath);
+
+console.log(`Loaded ${results.targets.length} targets from previous analysis`);
+```
+
+## Analysis Phases
+
+The BlackboxAttackSurfaceAgent follows a structured reconnaissance methodology:
+
+<Steps>
+  <Step title="Phase 1: Authentication (if credentials provided)">
+    The agent authenticates first if credentials are available, then proceeds with authenticated discovery.
+  </Step>
+  
+  <Step title="Phase 2: Subdomain Enumeration (if enabled)">
+    DNS brute-force, certificate transparency logs, zone transfers, and passive DNS lookup.
+  </Step>
+  
+  <Step title="Phase 3: Asset Discovery">
+    Port scanning, service enumeration, technology detection, and web crawling.
+  </Step>
+  
+  <Step title="Phase 4: Endpoint Discovery">
+    JavaScript extraction, API endpoint discovery, sitemap parsing, and robots.txt analysis.
+  </Step>
+  
+  <Step title="Phase 5: Target Selection">
+    Analysis of discovered assets to identify high-value targets for deep penetration testing.
+  </Step>
+  
+  <Step title="Phase 6: Report Generation">
+    Creates structured JSON report with all findings and pentest targets.
+  </Step>
+</Steps>
+
+## Scope Configuration
+
+Control reconnaissance scope through session configuration:
+
+<CodeGroup>
+```typescript Strict Scope
+const session = await createSession({
+  name: "Strict Recon",
+  targets: ["https://example.com"],
+  config: {
+    scopeConstraints: {
+      strictScope: true,
+      allowedHosts: ["example.com", "*.example.com"],
+      allowedPorts: [80, 443, 8080],
+    },
+  },
+});
+```
+
+```typescript Open Scope
+const session = await createSession({
+  name: "Open Recon",
+  targets: ["https://example.com"],
+  config: {
+    scopeConstraints: {
+      strictScope: false, // Allow discovery of adjacent targets
+    },
+  },
+});
+```
+</CodeGroup>
+
+## Helper Functions
+
+### parseDiscoveredAsset()
+
+Parse a discovered asset string into structured data.
+
+```typescript
+function parseDiscoveredAsset(asset: string): {
+  identifier: string;
+  description: string;
+  details?: string;
+}
+```
+
+### parseKeyFinding()
+
+Parse a key finding string into severity and description.
+
+```typescript
+function parseKeyFinding(finding: string): {
+  severity: string;
+  description: string;
+}
+```
+
+### getHighPriorityKeywords()
+
+Extract high-priority findings (CRITICAL and HIGH severity).
+
+```typescript
+function getHighPriorityKeywords(results: AttackSurfaceAnalysisResults): string[]
+```
+
+### extractPentestTargets()
+
+Extract simplified target objects for orchestration.
+
+```typescript
+function extractPentestTargets(results: AttackSurfaceAnalysisResults): Array<{
+  target: string;
+  objective: string;
+}>
+```
+
+## Best Practices
+
+<Note>
+  **Authentication First**: If credentials are provided, the agent authenticates before running any reconnaissance commands.
+</Note>
+
+<Warning>
+  **Subdomain Enumeration**: Only enable `enumerateSubdomains` when you have permission to perform active DNS enumeration on the target domain.
+</Warning>
+
+<Tip>
+  **Scope Control**: Use `strictScope: true` for bug bounty programs with defined scope. Use `strictScope: false` for comprehensive red team assessments.
+</Tip>
+
+## Related
+
+- [OffensiveSecurityAgent](/api/agents/offensive-security)
+- [TargetedPentestAgent](/api/agents/pentest)
+- [AuthenticationAgent](/api/agents/authentication)

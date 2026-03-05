@@ -1,0 +1,171 @@
+---
+title: API Overview
+description: Introduction to the Pensar Apex programmatic API
+---
+
+## Introduction
+
+Pensar Apex provides a powerful programmatic API that allows you to integrate AI-powered penetration testing directly into your applications, CI/CD pipelines, or custom security workflows.
+
+The API exposes the same battle-tested agents that power the CLI tool, giving you full control over:
+
+- **Attack surface discovery** (blackbox and whitebox)
+- **Authentication testing** and credential management
+- **Targeted penetration testing** with custom objectives
+- **Automated vulnerability patching**
+- **Benchmark comparison** for security testing frameworks
+
+## When to Use the API vs CLI
+
+### Use the API when:
+
+- **Automation**: You need to run security tests as part of CI/CD pipelines
+- **Integration**: You're building security tools or dashboards that need programmatic access
+- **Custom workflows**: You need fine-grained control over agent behavior and callbacks
+- **Batch processing**: You want to test multiple targets or configurations programmatically
+- **Custom storage**: You need to integrate findings with your own database or tracking system
+
+### Use the CLI when:
+
+- **Interactive testing**: You want real-time feedback with a rich terminal UI
+- **Ad-hoc assessments**: You're performing one-off security evaluations
+- **Learning**: You're exploring features or understanding how agents work
+- **Operator mode**: You need human-in-the-loop approval for tool execution
+
+## Architecture Overview
+
+The Pensar Apex API is built on three core concepts:
+
+### 1. Sessions
+
+Sessions provide isolated workspaces for each security assessment. Every session includes:
+
+- **Unique identifier** for tracking and resumption
+- **Directory structure** for findings, POCs, logs, and artifacts
+- **Configuration** including auth credentials, scope constraints, and rate limiting
+- **Credential manager** for secure secret handling (secrets never reach the AI model)
+
+```typescript
+import { sessions } from "@pensar/apex/core/session";
+
+const session = await sessions.create({
+  name: "API Security Test",
+  targets: ["https://api.example.com"],
+  config: {
+    authCredentials: {
+      username: "testuser",
+      password: "testpass",
+      loginUrl: "https://api.example.com/login"
+    },
+    scopeConstraints: {
+      strictScope: true,
+      allowedHosts: ["api.example.com"]
+    }
+  }
+});
+```
+
+### 2. Agents
+
+Agents are specialized AI-powered components that perform specific security tasks:
+
+- **Attack Surface Agent** (`runAttackSurfaceAgent`) - Discovers endpoints, assets, and authentication flows
+- **Authentication Agent** (`runAuthenticationAgent`) - Bypasses login mechanisms and extracts auth tokens
+- **Targeted Pentest Agent** (`runTargetedPentestAgent`) - Tests specific endpoints for vulnerabilities
+- **Pentest Agent** (`runPentestAgent`) - Full workflow combining attack surface + targeted testing
+- **Patching Agent** (`runPatchingAgent`) - Automatically generates and validates security patches
+- **Benchmark Agent** (`runBenchmarkComparisonAgent`) - Compares results against expected vulnerabilities
+
+Each agent:
+- Accepts a model (Claude, GPT-4, etc.) and session
+- Streams tool calls and results via callbacks
+- Returns typed results with findings and artifact paths
+- Supports abort signals for cancellation
+
+### 3. Callbacks
+
+The API uses a streaming callback pattern for real-time visibility:
+
+```typescript
+const result = await runPentestAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  callbacks: {
+    onTextDelta: (delta) => {
+      // Stream AI reasoning in real-time
+      process.stdout.write(delta.text);
+    },
+    onToolCall: (call) => {
+      // Log when tools are invoked
+      console.log(`→ calling ${call.toolName}`);
+    },
+    onToolResult: (result) => {
+      // Track tool execution results
+      console.log(`✓ ${result.toolName} completed`);
+    },
+    onError: (error) => {
+      // Handle errors gracefully
+      console.error("Agent error:", error);
+    }
+  }
+});
+```
+
+## API Modules
+
+The API is organized into focused modules:
+
+| Module | Description |
+|--------|-------------|
+| `@pensar/apex/core/api` | Main entry point - agent runner functions |
+| `@pensar/apex/core/session` | Session management and configuration |
+| `@pensar/apex/core/credentials` | Secure credential storage (in-memory only) |
+| `@pensar/apex/core/findings` | Findings registry for deduplication |
+| `@pensar/apex/core/ai` | AI model configuration and providers |
+
+## Security Considerations
+
+<Warning>
+**Credentials are never serialized to disk or sent to AI models.** 
+
+The credential manager stores secrets in memory only and provides credential IDs to agents. At tool execution time, IDs are resolved to actual secrets in a sandboxed context.
+</Warning>
+
+<Note>
+**Rate limiting is built-in.** 
+
+Each session includes a rate limiter that respects `requestsPerSecond` configuration to avoid overwhelming target systems.
+</Note>
+
+## Output Structure
+
+All agents write artifacts to a consistent session directory structure:
+
+```
+~/.pensar/executions/{session-id}/
+├── findings/           # Vulnerability reports (JSON)
+├── pocs/              # Proof-of-concept scripts
+├── logs/              # Execution logs
+├── scratchpad/        # Agent working notes
+├── assets/            # Screenshots, network captures
+├── auth/              # Authentication artifacts
+└── session.json       # Session metadata
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/api/getting-started">
+    Write your first integration with step-by-step examples
+  </Card>
+  <Card title="Agent Reference" icon="book" href="/api/agents">
+    Detailed documentation for each agent type
+  </Card>
+  <Card title="Configuration" icon="gear" href="/api/configuration">
+    Session config, auth credentials, and scope constraints
+  </Card>
+  <Card title="Examples" icon="code" href="/api/examples">
+    Real-world integration patterns and use cases
+  </Card>
+</CardGroup>

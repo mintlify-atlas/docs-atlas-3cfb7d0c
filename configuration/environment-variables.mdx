@@ -1,0 +1,518 @@
+---
+title: "Environment Variables"
+description: "Complete reference of all environment variables for configuring Pensar Apex"
+---
+
+Pensar Apex can be configured using environment variables. This is the recommended approach for CLI usage, CI/CD pipelines, and containerized deployments.
+
+<Note>
+Environment variables always take precedence over TUI configuration stored in `~/.pensar/config.json`.
+</Note>
+
+## AI Provider Configuration
+
+### Anthropic (Claude)
+
+<ParamField path="ANTHROPIC_API_KEY" type="string" required>
+  Anthropic API key for Claude models.
+
+  ```bash
+  export ANTHROPIC_API_KEY="sk-ant-..."
+  ```
+
+  Get your key at [console.anthropic.com](https://console.anthropic.com).
+</ParamField>
+
+### OpenAI
+
+<ParamField path="OPENAI_API_KEY" type="string">
+  OpenAI API key for GPT models.
+
+  ```bash
+  export OPENAI_API_KEY="sk-..."
+  ```
+
+  Get your key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+</ParamField>
+
+### OpenRouter
+
+<ParamField path="OPENROUTER_API_KEY" type="string">
+  OpenRouter API key for accessing multiple model providers.
+
+  ```bash
+  export OPENROUTER_API_KEY="sk-or-..."
+  ```
+
+  Get your key at [openrouter.ai](https://openrouter.ai).
+</ParamField>
+
+### AWS Bedrock
+
+#### Bearer Token Authentication
+
+<ParamField path="BEDROCK_API_KEY" type="string">
+  Bearer token for Bedrock API access.
+
+  ```bash
+  export BEDROCK_API_KEY="your-bearer-token"
+  export AWS_REGION="us-east-1"
+  ```
+</ParamField>
+
+#### IAM Credentials Authentication
+
+<ParamField path="AWS_ACCESS_KEY_ID" type="string">
+  AWS access key ID for IAM authentication.
+
+  ```bash
+  export AWS_ACCESS_KEY_ID="AKIA..."
+  ```
+</ParamField>
+
+<ParamField path="AWS_SECRET_ACCESS_KEY" type="string">
+  AWS secret access key for IAM authentication.
+
+  ```bash
+  export AWS_SECRET_ACCESS_KEY="..."
+  ```
+</ParamField>
+
+<ParamField path="AWS_SESSION_TOKEN" type="string">
+  AWS session token for temporary credentials (optional).
+
+  ```bash
+  export AWS_SESSION_TOKEN="..."
+  ```
+
+  Required only when using temporary credentials from AWS STS.
+</ParamField>
+
+<ParamField path="AWS_REGION" type="string" default="us-east-1">
+  AWS region for Bedrock API.
+
+  ```bash
+  export AWS_REGION="us-east-1"
+  ```
+
+  Common regions: `us-east-1`, `us-west-2`, `eu-west-1`.
+</ParamField>
+
+### Local Models (vLLM)
+
+<ParamField path="LOCAL_MODEL_URL" type="string">
+  vLLM server endpoint URL.
+
+  ```bash
+  export LOCAL_MODEL_URL="http://localhost:8000/v1"
+  ```
+
+  Must point to an OpenAI-compatible API endpoint.
+</ParamField>
+
+## Remote Execution Providers
+
+<Warning>
+These are optional enterprise features for distributed pentesting. Most users don't need them.
+</Warning>
+
+<ParamField path="DAYTONA_API_KEY" type="string">
+  Daytona API key for remote agent execution.
+
+  ```bash
+  export DAYTONA_API_KEY="..."
+  ```
+</ParamField>
+
+<ParamField path="DAYTONA_ORG_ID" type="string">
+  Daytona organization ID.
+
+  ```bash
+  export DAYTONA_ORG_ID="org_..."
+  ```
+</ParamField>
+
+<ParamField path="RUNLOOP_API_KEY" type="string">
+  Runloop API key for remote execution.
+
+  ```bash
+  export RUNLOOP_API_KEY="..."
+  ```
+</ParamField>
+
+## Debugging and Development
+
+<ParamField path="PENSAR_DEBUG" type="string" default="false">
+  Enable debug logging.
+
+  ```bash
+  export PENSAR_DEBUG="true"
+  pensar pentest --target https://example.com
+  ```
+
+  Outputs detailed agent execution logs to console.
+</ParamField>
+
+<ParamField path="SHOW_CONSOLE" type="string" default="false">
+  Show console output in TUI development mode.
+
+  ```bash
+  export SHOW_CONSOLE="true"
+  bun run dev
+  ```
+
+  Used only for TUI development.
+</ParamField>
+
+## CI/CD Configuration
+
+### GitHub Actions
+
+Store API keys as repository secrets:
+
+```yaml .github/workflows/pentest.yml
+name: Pentest
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
+
+jobs:
+  pentest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pensar Apex
+        run: npm install -g @pensar/apex
+
+      - name: Run Pentest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pensar pentest \
+            --target https://staging.example.com \
+            --cwd . \
+            --model claude-sonnet-4-5
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pentest-results
+          path: ~/.pensar/sessions/**/findings/
+```
+
+### GitLab CI
+
+```yaml .gitlab-ci.yml
+pentest:
+  image: node:18
+  before_script:
+    - npm install -g @pensar/apex
+  script:
+    - pensar pentest --target https://staging.example.com --cwd .
+  variables:
+    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+  artifacts:
+    paths:
+      - ~/.pensar/sessions/**/findings/
+    expire_in: 30 days
+  only:
+    - schedules
+```
+
+### Docker
+
+Pass environment variables to the container:
+
+```bash
+docker run -it \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  -v $(pwd):/workspace \
+  pensarai/apex \
+  pensar pentest --target https://example.com --cwd /workspace
+```
+
+Or use an `.env` file:
+
+```bash .env
+ANTHROPIC_API_KEY=sk-ant-...
+AWS_REGION=us-east-1
+```
+
+```bash
+# Load from .env file
+docker run -it --env-file .env pensarai/apex pensar pentest --target https://example.com
+```
+
+## Configuration Priority
+
+When multiple configuration sources are present, Pensar Apex uses this priority order (highest to lowest):
+
+1. **Environment variables** (highest priority)
+2. **Command-line flags** (e.g., `--model`)
+3. **`~/.pensar/config.json`** (TUI settings)
+4. **Default values** (lowest priority)
+
+### Example
+
+```bash
+# Config file has: "selectedModelId": "claude-sonnet-3-5"
+# Environment has: ANTHROPIC_API_KEY=...
+# Command-line has: --model claude-opus-4
+
+pensar pentest --target https://example.com --model claude-opus-4
+
+# Result: Uses claude-opus-4 (command-line overrides config file)
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Never commit API keys to version control">
+    Use `.gitignore` to exclude environment files:
+
+    ```bash .gitignore
+    .env
+    .env.local
+    .pensar/config.json
+    ```
+
+    Use secret management in CI/CD instead of hardcoding keys.
+  </Accordion>
+
+  <Accordion title="Use separate keys for different environments">
+    ```bash
+    # Development
+    export ANTHROPIC_API_KEY="sk-ant-dev-..."
+
+    # Production
+    export ANTHROPIC_API_KEY="sk-ant-prod-..."
+    ```
+
+    This allows tracking usage and revoking keys per environment.
+  </Accordion>
+
+  <Accordion title="Rotate API keys regularly">
+    ```bash
+    # Generate new key at provider console
+    # Update environment variable
+    export ANTHROPIC_API_KEY="sk-ant-new-..."
+
+    # Test new key
+    pensar doctor
+
+    # Revoke old key at provider console
+    ```
+
+    Rotate keys every 90 days or when team members leave.
+  </Accordion>
+
+  <Accordion title="Use IAM roles instead of static credentials (AWS)">
+    For EC2, ECS, or Lambda deployments:
+
+    ```bash
+    # No need to set AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY
+    # IAM role credentials are automatically discovered
+    export AWS_REGION="us-east-1"
+    pensar pentest --target https://example.com
+    ```
+
+    Attach an IAM role with `bedrock:InvokeModel` permission.
+  </Accordion>
+
+  <Accordion title="Encrypt environment files">
+    If you must store `.env` files locally:
+
+    ```bash
+    # Encrypt
+    gpg -c .env
+
+    # Decrypt when needed
+    gpg .env.gpg
+    source .env
+    ```
+
+    Better: Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.).
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Per-Project Configuration
+
+Create a `.env` file per project:
+
+```bash my-project/.env
+ANTHROPIC_API_KEY=sk-ant-...
+TARGET_URL=https://staging.myapp.com
+SOURCE_PATH=/path/to/source
+```
+
+```bash
+# Load and run
+source .env
+pensar pentest --target "$TARGET_URL" --cwd "$SOURCE_PATH"
+```
+
+### Multi-Provider Setup
+
+Configure all providers for fallback:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-or-..."
+
+# Pensar will use Anthropic by default
+# Falls back to OpenAI if Anthropic fails
+```
+
+### Testing with Different Models
+
+```bash
+# Set provider keys once
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+
+# Test with different models
+pensar pentest --target https://example.com --model claude-sonnet-4-5
+pensar pentest --target https://example.com --model gpt-4
+pensar pentest --target https://example.com --model claude-opus-4
+```
+
+## Environment Variable Files
+
+### Loading with `source`
+
+```bash
+# Create .env
+cat > .env <<EOF
+ANTHROPIC_API_KEY=sk-ant-...
+AWS_REGION=us-east-1
+EOF
+
+# Load into current shell
+source .env
+
+# Run pentest
+pensar pentest --target https://example.com
+```
+
+### Loading with `dotenv` (Node.js)
+
+For programmatic usage:
+
+```typescript
+import { config } from 'dotenv';
+import { runPentestAgent } from '@pensar/apex';
+
+// Load .env file
+config();
+
+// Environment variables are now available
+const result = await runPentestAgent({
+  target: process.env.TARGET_URL!,
+  model: 'claude-sonnet-4-5',
+  // authConfig is automatically built from process.env
+});
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Environment variable not recognized">
+    Verify the variable is exported:
+
+    ```bash
+    # Check if set
+    echo $ANTHROPIC_API_KEY
+
+    # If empty, export it
+    export ANTHROPIC_API_KEY="sk-ant-..."
+
+    # Verify again
+    echo $ANTHROPIC_API_KEY
+    ```
+
+    Variables must be `export`ed to be visible to child processes.
+  </Accordion>
+
+  <Accordion title="API key works in shell but not in TUI">
+    Ensure the variable is exported before launching the TUI:
+
+    ```bash
+    # Wrong:
+    ANTHROPIC_API_KEY=sk-ant-... pensar  # Variable not exported
+
+    # Right:
+    export ANTHROPIC_API_KEY=sk-ant-...
+    pensar
+    ```
+  </Accordion>
+
+  <Accordion title="Variables not persisting across sessions">
+    Add exports to your shell profile:
+
+    ```bash
+    # For bash
+    echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
+    source ~/.bashrc
+
+    # For zsh
+    echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
+    source ~/.zshrc
+    ```
+
+    Better: Use a secrets manager or environment manager like `direnv`.
+  </Accordion>
+
+  <Accordion title="AWS credentials not working">
+    For IAM credentials, verify all required variables:
+
+    ```bash
+    echo $AWS_ACCESS_KEY_ID
+    echo $AWS_SECRET_ACCESS_KEY
+    echo $AWS_REGION
+
+    # Test with AWS CLI
+    aws sts get-caller-identity
+    ```
+
+    If AWS CLI works but Pensar doesn't, check that credentials have `bedrock:InvokeModel` permission.
+  </Accordion>
+</AccordionGroup>
+
+## Quick Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (recommended) |
+| `OPENAI_API_KEY` | Yes* | OpenAI API key |
+| `OPENROUTER_API_KEY` | Yes* | OpenRouter API key |
+| `BEDROCK_API_KEY` | Yes* | AWS Bedrock bearer token |
+| `AWS_ACCESS_KEY_ID` | Yes* | AWS IAM access key |
+| `AWS_SECRET_ACCESS_KEY` | Yes* | AWS IAM secret key |
+| `AWS_SESSION_TOKEN` | No | AWS temporary session token |
+| `AWS_REGION` | No | AWS region (default: `us-east-1`) |
+| `LOCAL_MODEL_URL` | Yes* | vLLM server endpoint |
+| `PENSAR_DEBUG` | No | Enable debug logging |
+
+*At least one AI provider key is required.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Providers" icon="robot" href="/configuration/ai-providers">
+    Learn about each supported provider
+  </Card>
+  <Card title="Model Selection" icon="sliders" href="/configuration/models">
+    Choose the right model for your needs
+  </Card>
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Use environment variables in containers
+  </Card>
+  <Card title="Run Pentest" icon="rocket" href="/quickstart">
+    Start testing with your configuration
+  </Card>
+</CardGroup>

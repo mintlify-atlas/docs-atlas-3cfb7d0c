@@ -1,0 +1,404 @@
+---
+title: "Sessions"
+description: "Understanding and managing Pensar Apex testing sessions"
+---
+
+Pensar Apex organizes all testing activity into **sessions**. Each session is an isolated workspace that stores findings, POCs, logs, and configuration.
+
+## What is a Session?
+
+A session represents a single penetration test engagement. It contains:
+
+- **Attack surface data**: Discovered endpoints, pages, and infrastructure
+- **Findings**: Vulnerability reports in JSON format
+- **Proof-of-concepts**: Exploit scripts (bash, HTML)
+- **Reports**: Markdown summaries and aggregated findings
+- **Logs**: Agent execution logs and API responses
+- **Configuration**: Target URLs, authentication info, testing objectives
+
+<Note>
+Sessions are automatically created when you run a pentest. You don't need to create them manually in most cases.
+</Note>
+
+## Session Directory Structure
+
+Sessions are stored in `~/.pensar/sessions/`:
+
+```
+~/.pensar/sessions/
+├── abc123-def456/              # Session ID
+│   ├── session.json           # Session metadata
+│   ├── findings/              # Vulnerability findings
+│   │   ├── findings.json      # Aggregated findings
+│   │   ├── finding_sqli_1.json
+│   │   └── finding_xss_2.json
+│   ├── pocs/                  # Proof-of-concept exploits
+│   │   ├── poc_sqli_login.sh
+│   │   └── poc_xss_reflected.html
+│   ├── report.md              # Markdown report
+│   ├── logs/                  # Agent logs
+│   │   ├── agent_pentest_1.log
+│   │   └── agent_auth_2.log
+│   └── attack_surface/        # Discovery results
+│       ├── targets.json
+│       └── assets.json
+└── xyz789-uvw012/             # Another session
+    └── ...
+```
+
+## Session Lifecycle
+
+### 1. Creation
+
+Sessions are created when you start a pentest:
+
+<CodeGroup>
+```bash CLI
+pensar pentest --target https://example.com
+# Creates new session automatically
+```
+
+```typescript API
+import { sessions } from '@pensar/apex';
+
+const session = await sessions.create({
+  name: 'Pentest: example.com',
+  targets: ['https://example.com'],
+  config: {
+    // Optional configuration
+  }
+});
+
+console.log('Session ID:', session.id);
+console.log('Session path:', session.rootPath);
+```
+</CodeGroup>
+
+### 2. Active Testing
+
+During testing:
+
+- Findings are written to `findings/`
+- POCs are created in `pocs/`
+- Logs accumulate in `logs/`
+- Attack surface data populates `attack_surface/`
+
+### 3. Completion
+
+When the pentest finishes:
+
+- All findings are aggregated into `findings.json`
+- A markdown report is generated at `report.md`
+- Session status is updated in `session.json`
+
+### 4. Review
+
+After completion, you can:
+
+- Review findings in the TUI
+- Read the markdown report
+- Execute POC scripts
+- Share results with your team
+
+## Session Metadata
+
+Each session has a `session.json` file:
+
+```json
+{
+  "id": "abc123-def456",
+  "name": "Blackbox Pentest",
+  "created": "2024-03-05T10:30:00.000Z",
+  "updated": "2024-03-05T11:45:00.000Z",
+  "status": "completed",
+  "targets": [
+    "https://example.com"
+  ],
+  "config": {
+    "cwd": null,
+    "exfilMode": false
+  },
+  "findingsCount": 3,
+  "pocsCount": 3,
+  "model": "claude-sonnet-4-5"
+}
+```
+
+## Managing Sessions
+
+### View Active Sessions (TUI)
+
+<Steps>
+  <Step title="Launch TUI">
+    ```bash
+    pensar
+    ```
+  </Step>
+
+  <Step title="Navigate to Sessions">
+    Use arrow keys or type `/sessions` to view all sessions.
+  </Step>
+
+  <Step title="Select a Session">
+    Press Enter to view findings, POCs, and reports for that session.
+  </Step>
+</Steps>
+
+### List Sessions (CLI)
+
+```bash
+# List all session directories
+ls -la ~/.pensar/sessions/
+
+# View session metadata
+cat ~/.pensar/sessions/abc123-def456/session.json | jq
+
+# Count findings
+ls ~/.pensar/sessions/abc123-def456/findings/ | wc -l
+```
+
+### Programmatic Access
+
+```typescript
+import { sessions } from '@pensar/apex';
+
+// Create a session
+const session = await sessions.create({
+  name: 'API Pentest',
+  targets: ['https://api.example.com'],
+});
+
+// Access session paths
+console.log('Root:', session.rootPath);
+console.log('Findings:', session.findingsPath);
+console.log('POCs:', session.pocsPath);
+console.log('Logs:', session.logsPath);
+
+// Load existing session
+const loaded = await sessions.load('abc123-def456');
+```
+
+## Session Configuration
+
+Sessions can store custom configuration:
+
+```typescript
+const session = await sessions.create({
+  name: 'Whitebox Pentest',
+  targets: ['https://example.com'],
+  config: {
+    cwd: '/path/to/source',        // Enable whitebox mode
+    exfilMode: true,                 // Enable exfil/pivoting mode
+    credentials: {
+      username: 'test@example.com',
+      password: 'stored-securely'    // Never exposed to AI
+    }
+  }
+});
+```
+
+<Warning>
+Credentials stored in session config are never sent to AI models. They're used only by browser tools.
+</Warning>
+
+## Findings and Reports
+
+### Individual Findings
+
+Each finding is a separate JSON file:
+
+```json
+{
+  "id": "finding_sqli_1",
+  "title": "SQL Injection in Login Form",
+  "severity": "CRITICAL",
+  "endpoint": "https://example.com/api/login",
+  "description": "...",
+  "impact": "...",
+  "evidence": "...",
+  "pocPath": "pocs/poc_sqli_login.sh",
+  "remediation": "...",
+  "references": "CWE-89"
+}
+```
+
+### Aggregated Findings
+
+All findings are combined in `findings.json`:
+
+```json
+{
+  "findings": [
+    { /* finding 1 */ },
+    { /* finding 2 */ },
+    { /* finding 3 */ }
+  ],
+  "summary": {
+    "total": 3,
+    "bySeverity": {
+      "CRITICAL": 1,
+      "HIGH": 1,
+      "MEDIUM": 1,
+      "LOW": 0
+    }
+  }
+}
+```
+
+### Markdown Reports
+
+A human-readable report is generated at `report.md`:
+
+```markdown
+# Penetration Test Report
+
+**Target**: https://example.com
+**Date**: 2024-03-05
+**Findings**: 3 (1 Critical, 1 High, 1 Medium)
+
+## Executive Summary
+
+The assessment identified 3 vulnerabilities...
+
+## Findings
+
+### 1. SQL Injection in Login Form (CRITICAL)
+
+**Endpoint**: `https://example.com/api/login`
+
+**Description**: ...
+
+**Proof of Concept**: See `pocs/poc_sqli_login.sh`
+
+**Remediation**: ...
+```
+
+## Session Cleanup
+
+### Delete a Session
+
+```bash
+# Delete specific session
+rm -rf ~/.pensar/sessions/abc123-def456
+
+# Delete all sessions
+rm -rf ~/.pensar/sessions/*
+```
+
+<Warning>
+Deleting a session removes all findings, POCs, and logs permanently. Export important data first.
+</Warning>
+
+### Archive Sessions
+
+```bash
+# Archive to compressed file
+tar -czf pentest-example-com.tar.gz ~/.pensar/sessions/abc123-def456
+
+# Restore later
+tar -xzf pentest-example-com.tar.gz -C ~/
+```
+
+## Session Best Practices
+
+<AccordionGroup>
+  <Accordion title="Name sessions descriptively">
+    Use clear names that identify the target and test type:
+
+    ```typescript
+    await sessions.create({
+      name: 'Pentest: example.com (Blackbox)',
+      targets: ['https://example.com']
+    });
+    ```
+
+    Better than generic names like "Test 1" or "Pentest".
+  </Accordion>
+
+  <Accordion title="Archive completed sessions">
+    After testing, compress and store sessions:
+
+    ```bash
+    cd ~/.pensar/sessions
+    tar -czf ~/pentests/example-com-2024-03.tar.gz abc123-def456/
+    ```
+
+    This saves disk space while preserving results.
+  </Accordion>
+
+  <Accordion title="Review sessions regularly">
+    Use the TUI to review past sessions:
+
+    ```bash
+    pensar
+    # Navigate to Sessions
+    # Review findings and trends
+    ```
+
+    This helps identify recurring vulnerabilities across targets.
+  </Accordion>
+
+  <Accordion title="Export findings for reporting">
+    Share findings with stakeholders:
+
+    ```bash
+    # Copy markdown report
+    cp ~/.pensar/sessions/abc123-def456/report.md ./pentest-report.md
+
+    # Convert to PDF (requires pandoc)
+    pandoc report.md -o report.pdf
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Session directory not found">
+    If `~/.pensar/sessions/` doesn't exist, it will be created on first pentest:
+
+    ```bash
+    # Manually create if needed
+    mkdir -p ~/.pensar/sessions
+    ```
+  </Accordion>
+
+  <Accordion title="Findings not appearing">
+    Check the session logs for errors:
+
+    ```bash
+    tail -n 50 ~/.pensar/sessions/abc123-def456/logs/agent_pentest_1.log
+    ```
+
+    Look for agent errors or API failures.
+  </Accordion>
+
+  <Accordion title="Disk space issues">
+    Large sessions can consume significant space (logs, POCs):
+
+    ```bash
+    # Check session sizes
+    du -sh ~/.pensar/sessions/*
+
+    # Clean old sessions
+    find ~/.pensar/sessions -mtime +30 -type d -exec rm -rf {} \;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Run Your First Pentest" icon="rocket" href="/quickstart">
+    Create your first session by running a pentest
+  </Card>
+  <Card title="Understanding Findings" icon="magnifying-glass" href="/concepts/findings">
+    Learn about vulnerability findings structure
+  </Card>
+  <Card title="Command Reference" icon="terminal" href="/commands/overview">
+    Explore all CLI commands for session management
+  </Card>
+  <Card title="API Documentation" icon="code" href="/api/overview">
+    Programmatic session management
+  </Card>
+</CardGroup>

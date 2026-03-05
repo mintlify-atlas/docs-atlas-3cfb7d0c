@@ -1,0 +1,605 @@
+---
+title: 'Docker Setup'
+description: 'Run Pensar Apex in a Kali Linux container with pre-installed pentest tools'
+icon: 'docker'
+---
+
+## Overview
+
+For **best performance**, run Apex in the included **Kali Linux container** with preconfigured penetration testing tools. This provides:
+
+- **Pre-installed tools**: nmap, gobuster, sqlmap, nikto, hydra, john, hashcat, and more
+- **Consistent environment**: Same tooling across all developers/CI systems
+- **Isolation**: Keep pentest tools separate from your host system
+- **Network flexibility**: Use `host` network mode for comprehensive scanning
+
+<Note>
+  The Kali container is **recommended for production use** but not required. Apex works on any system with Bun installed.
+</Note>
+
+## Quick Start
+
+<Steps>
+  <Step title="Navigate to Container Directory">
+    ```bash
+    cd container
+    ```
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Copy the example environment file and add your API keys:
+    ```bash
+    cp env.example .env
+    ```
+
+    Edit `.env` with your API keys:
+    ```bash
+    # .env
+    ANTHROPIC_API_KEY=sk-ant-xxx
+    OPENROUTER_API_KEY=sk-or-xxx  # optional
+    ```
+  </Step>
+
+  <Step title="Build and Start Container">
+    ```bash
+    docker compose up --build -d
+    ```
+  </Step>
+
+  <Step title="Exec Into Container">
+    ```bash
+    docker compose exec kali-apex bash
+    ```
+  </Step>
+
+  <Step title="Run Apex">
+    Inside the container:
+    ```bash
+    pensar
+    ```
+  </Step>
+</Steps>
+
+## Docker Compose Configuration
+
+The included `docker-compose.yml` provides a complete Kali Linux environment:
+
+```yaml
+# container/docker-compose.yml
+services:
+  kali-apex:
+    build: .
+    image: kali-apex:latest
+    container_name: kali-apex
+    tty: true
+    stdin_open: true
+    network_mode: "bridge" # consider "host" on Linux for full network access
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - seccomp:unconfined
+    env_file:
+      - .env
+    environment:
+      - DISABLE_TELEMETRY=1
+      - DISABLE_AUTOUPDATER=1
+      - DISABLE_ERROR_REPORTING=1
+    volumes:
+      - ../:/home/pentest/app
+      - ./workspace:/home/pentest/workspace
+    working_dir: /home/pentest/app
+```
+
+### Key Configuration Options
+
+#### Network Mode
+
+**Bridge Mode (Default)**
+- Isolated network namespace
+- Port mapping required for external access
+- **Use for**: General pentesting, web app testing
+
+**Host Mode (Linux only)**
+- Direct access to host network
+- No port mapping needed
+- **Use for**: Network scanning, testing local services, comprehensive recon
+
+```yaml
+# For full network access on Linux hosts:
+network_mode: "host"
+```
+
+<Warning>
+  Host mode is **only available on Linux**. On macOS/Windows, use bridge mode or configure port forwarding.
+</Warning>
+
+#### Capabilities
+
+```yaml
+cap_add:
+  - NET_ADMIN  # Required for network configuration
+  - NET_RAW    # Required for raw packet manipulation (nmap, etc.)
+```
+
+These capabilities allow:
+- Port scanning with nmap
+- Packet capture with tcpdump
+- Raw socket operations
+
+#### Security Options
+
+```yaml
+security_opt:
+  - seccomp:unconfined
+```
+
+Unconfined seccomp allows unrestricted syscall access, needed for low-level network operations.
+
+<Note>
+  These elevated permissions are **intentional for a pentest environment**. Do not use this configuration for production services.
+</Note>
+
+## Dockerfile Breakdown
+
+The Kali container is built from the official Kali Rolling image:
+
+```dockerfile
+# container/Dockerfile
+FROM kalilinux/kali-rolling:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG USER=pentest
+ARG UID=1000
+ARG GID=1000
+
+# Core tooling and common pentest utilities
+RUN apt-get update && apt-get dist-upgrade -y && \
+    apt-get install -y --no-install-recommends \
+      sudo git curl wget ca-certificates tmux \
+      python3 python3-pip python3-venv \
+      build-essential gcc g++ make cmake perl ruby \
+      netcat-openbsd socat nmap tcpdump iproute2 iputils-ping \
+      gdb gdb-multiarch binutils-multiarch \
+      strace ltrace hexedit upx \
+      binwalk radare2 \
+      unzip zip zlib1g-dev \
+      gobuster sqlmap nikto hydra john hashcat \
+      foremost exiftool \
+      wireshark-common \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install bun system-wide (required for @pensar/apex)
+ENV BUN_INSTALL="/usr/local"
+RUN curl -fsSL https://bun.sh/install | bash
+
+# Install @pensar/apex globally
+RUN bun install -g @pensar/apex
+
+# Create non-root user for safety
+RUN groupadd -g ${GID} ${USER} || true \
+ && useradd -m -u ${UID} -g ${GID} -s /bin/bash ${USER} \
+ && echo "${USER} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${USER} \
+ && chmod 0440 /etc/sudoers.d/${USER}
+
+WORKDIR /home/${USER}
+USER ${USER}
+ENV HOME=/home/${USER}
+
+# Load variables from ~/.env automatically for convenience inside the shell
+RUN echo 'if [ -f ~/.env ]; then' >> ~/.bashrc && \
+    echo '    export $(cat ~/.env | xargs)' >> ~/.bashrc && \
+    echo 'fi' >> ~/.bashrc
+
+ENTRYPOINT ["/bin/bash"]
+```
+
+### Installed Tools
+
+The container includes these pentest tools used by Apex:
+
+| Tool | Purpose |
+|------|----------|
+| **nmap** | Port scanning and service detection |
+| **gobuster** | Directory/file brute forcing |
+| **sqlmap** | SQL injection testing |
+| **nikto** | Web server vulnerability scanning |
+| **hydra** | Login brute forcing |
+| **john** | Password cracking |
+| **hashcat** | GPU-accelerated password cracking |
+| **binwalk** | Firmware analysis |
+| **radare2** | Binary analysis and reverse engineering |
+| **foremost** | File carving from disk images |
+| **exiftool** | Metadata extraction |
+
+<Note>
+  Apex automatically detects which tools are available and adjusts its testing strategy accordingly. Run `pensar doctor` to check installed dependencies.
+</Note>
+
+## Network Modes Explained
+
+### Bridge Mode (Default)
+
+```yaml
+network_mode: "bridge"
+```
+
+**How it works:**
+- Container gets its own network namespace
+- Docker creates a virtual bridge (docker0)
+- Container IP is in Docker's subnet (e.g., 172.17.0.0/16)
+- Port mapping required to access services from host
+
+**Use when:**
+- Testing external web applications
+- Running on macOS or Windows
+- You want network isolation
+
+**Example:** Testing `https://staging.example.com`
+```bash
+docker compose up -d
+docker compose exec kali-apex bash
+pensar pentest --target https://staging.example.com
+```
+
+### Host Mode (Linux Only)
+
+```yaml
+network_mode: "host"
+```
+
+**How it works:**
+- Container uses the host's network stack directly
+- No network isolation
+- Container can access localhost, LAN devices, etc.
+
+**Use when:**
+- Scanning local network (192.168.x.x)
+- Testing localhost services
+- Comprehensive network reconnaissance
+- Need raw socket access
+
+<Warning>
+  On Linux hosts, consider using `network_mode: host` for comprehensive network scanning.
+</Warning>
+
+**Example:** Scanning your local network
+```yaml
+# docker-compose.yml (on Linux)
+network_mode: "host"
+```
+
+```bash
+docker compose up -d
+docker compose exec kali-apex bash
+pensar pentest --target 192.168.1.100
+```
+
+### Custom Bridge Networks
+
+For multi-container setups:
+
+```yaml
+networks:
+  pentest:
+    driver: bridge
+
+services:
+  kali-apex:
+    networks:
+      - pentest
+
+  vulnerable-app:
+    image: webgoat/webgoat:latest
+    networks:
+      - pentest
+```
+
+Now Apex can test `vulnerable-app` by hostname:
+```bash
+pensar pentest --target http://vulnerable-app:8080
+```
+
+## Environment Variables
+
+The `.env` file is automatically loaded inside the container:
+
+```bash
+# container/.env
+
+# Required: AI provider API key
+ANTHROPIC_API_KEY=sk-ant-xxx
+
+# Optional: Additional providers
+OPENROUTER_API_KEY=sk-or-xxx
+OPENAI_API_KEY=sk-xxx
+
+# Optional: vLLM local model
+LOCAL_MODEL_URL=http://localhost:8000/v1
+
+# Optional: Disable telemetry
+DISABLE_TELEMETRY=1
+DISABLE_AUTOUPDATER=1
+DISABLE_ERROR_REPORTING=1
+```
+
+The Dockerfile automatically exports these variables in the shell:
+
+```bash
+# From Dockerfile
+RUN echo 'if [ -f ~/.env ]; then' >> ~/.bashrc && \
+    echo '    export $(cat ~/.env | xargs)' >> ~/.bashrc && \
+    echo 'fi' >> ~/.bashrc
+```
+
+## Volume Mounts
+
+```yaml
+volumes:
+  - ../:/home/pentest/app        # Mount source code (for whitebox testing)
+  - ./workspace:/home/pentest/workspace  # Persistent workspace
+```
+
+### Source Code Mount
+
+The `../:/home/pentest/app` mount allows whitebox testing:
+
+```bash
+# Inside container
+cd /home/pentest/app
+pensar pentest --target https://staging.example.com --cwd .
+```
+
+### Workspace Mount
+
+The `workspace/` directory persists across container restarts:
+- Session data
+- Findings
+- Reports
+- Screenshots
+
+```bash
+# On host
+ls container/workspace/
+# sessions/  findings/  reports/
+```
+
+## Common Workflows
+
+### Testing a Web Application
+
+```bash
+# Start container
+cd container
+docker compose up -d
+
+# Exec in
+docker compose exec kali-apex bash
+
+# Inside container
+pensar pentest --target https://webapp.example.com
+```
+
+### Whitebox Testing with Source Code
+
+```bash
+# Container already mounts source from ../
+cd container
+docker compose up -d
+docker compose exec kali-apex bash
+
+# Inside container, source is at /home/pentest/app
+cd /home/pentest/app
+pensar pentest --target https://staging.example.com --cwd .
+```
+
+### Network Scanning (Linux)
+
+```yaml
+# docker-compose.yml
+network_mode: "host"
+```
+
+```bash
+docker compose up --build -d
+docker compose exec kali-apex bash
+
+# Scan local network
+pensar pentest --target 192.168.1.0/24
+```
+
+## Troubleshooting
+
+### "Permission denied" when running nmap
+
+**Cause:** Missing `NET_RAW` capability.
+
+**Solution:** Ensure `cap_add` includes `NET_RAW` in `docker-compose.yml`:
+```yaml
+cap_add:
+  - NET_ADMIN
+  - NET_RAW
+```
+
+### Container exits immediately
+
+**Cause:** Missing `tty: true` and `stdin_open: true`.
+
+**Solution:** Verify your `docker-compose.yml` includes:
+```yaml
+tty: true
+stdin_open: true
+```
+
+### "Cannot connect to target" on localhost
+
+**Cause:** Bridge mode isolates the container network.
+
+**Solutions:**
+1. Use host mode (Linux only): `network_mode: "host"`
+2. Use `host.docker.internal` instead of `localhost`:
+   ```bash
+   pensar pentest --target http://host.docker.internal:3000
+   ```
+3. Use the host's LAN IP (e.g., `192.168.1.100`)
+
+### Tools not found (nmap, gobuster, etc.)
+
+**Cause:** Container wasn't rebuilt after Dockerfile changes.
+
+**Solution:** Rebuild with `--no-cache`:
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+### API key not recognized inside container
+
+**Cause:** `.env` file not created or mounted.
+
+**Solution:**
+1. Ensure `container/.env` exists:
+   ```bash
+   cd container
+   ls -la .env
+   ```
+2. Verify `env_file: - .env` is in `docker-compose.yml`
+3. Restart container:
+   ```bash
+   docker compose down
+   docker compose up -d
+   ```
+4. Test inside container:
+   ```bash
+   docker compose exec kali-apex bash
+   echo $ANTHROPIC_API_KEY
+   ```
+
+## Advanced Configuration
+
+### Custom Dockerfile
+
+Add additional tools:
+
+```dockerfile
+# container/Dockerfile.custom
+FROM kali-apex:latest
+
+# Install additional tools
+RUN apt-get update && apt-get install -y \
+  metasploit-framework \
+  burpsuite \
+  zaproxy
+```
+
+```yaml
+# docker-compose.yml
+services:
+  kali-apex:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom
+```
+
+### GPU Access for Hashcat
+
+```yaml
+services:
+  kali-apex:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+### Multiple Containers for Parallel Testing
+
+```yaml
+services:
+  apex-1:
+    image: kali-apex:latest
+    container_name: apex-1
+    # ... config ...
+
+  apex-2:
+    image: kali-apex:latest
+    container_name: apex-2
+    # ... config ...
+```
+
+Run parallel pentests:
+```bash
+docker compose exec apex-1 bash -c "pensar pentest --target https://target1.com"
+docker compose exec apex-2 bash -c "pensar pentest --target https://target2.com"
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+name: Pentest in Docker
+on: [push]
+
+jobs:
+  pentest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Kali Container
+        run: |
+          cd container
+          docker compose build
+
+      - name: Run Pentest
+        run: |
+          cd container
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" > .env
+          docker compose up -d
+          docker compose exec -T kali-apex pensar pentest --target https://staging.example.com
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: pentest-report
+          path: container/workspace/sessions/*/report.md
+```
+
+### GitLab CI
+
+```yaml
+pentest:
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - cd container
+    - docker compose build
+    - echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" > .env
+    - docker compose up -d
+    - docker compose exec -T kali-apex pensar pentest --target $CI_ENVIRONMENT_URL
+  artifacts:
+    paths:
+      - container/workspace/sessions/*/report.md
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Testing" icon="shield-halved" href="/guides/blackbox-testing">
+    Run external penetration tests from the Kali container
+  </Card>
+  <Card title="Whitebox Testing" icon="code" href="/guides/whitebox-testing">
+    Analyze source code with the --cwd flag
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Configure credentials for authenticated testing
+  </Card>
+  <Card title="vLLM Setup" icon="server" href="/guides/vllm-setup">
+    Use local models instead of cloud APIs
+  </Card>
+</CardGroup>

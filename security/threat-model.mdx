@@ -1,0 +1,219 @@
+---
+title: Threat Model
+description: Security assumptions, trust boundaries, and operational risks for Pensar Apex
+---
+
+This page documents the threat model and security assumptions that govern how Pensar Apex is designed, deployed, and operated.
+
+## Trust Boundaries
+
+Apex operates under the following trust assumptions:
+
+### Local Machine Control
+
+**The user running the CLI has full control over their local machine.** Local developer tooling and service scripts operate in a trusted-user context.
+
+- The operating system and file system are trusted
+- The user has legitimate administrative access
+- Configuration files in `~/.pensar/` are under user control
+- The user is responsible for securing their own environment
+
+### Repository Trust
+
+**Files within the repository are trusted.** Internal scripts, benchmark utilities, and CI tooling assume trusted inputs from the repository itself.
+
+- Source code is assumed to be authentic and unmodified
+- Build scripts and development tooling operate on trusted inputs
+- Internal utilities are designed for developer use, not adversarial scenarios
+
+### Primary Security Boundary
+
+**The CLI and hosted services are the primary security boundary.** These are the components through which untrusted external input enters the system during normal product usage.
+
+Security controls focus on:
+- Input validation for user-provided targets and parameters
+- Safe handling of responses from potentially hostile services
+- Secure credential storage and transmission
+- Isolation between different testing sessions
+
+### Non-Shipped Components
+
+**Non-shipped components are not part of the product attack surface.** Code excluded from the npm package (such as `src/core/benchmark/`, `scripts/`, etc.) is internal tooling and is not designed to be executed by end users or against adversarial inputs as part of product functionality.
+
+Components with limited security scope:
+- Developer tooling and internal scripts (`scripts/`)
+- Benchmark runners and CI utilities
+- Test harnesses and local development utilities
+- Code excluded by `package.json` `files` field and `.npmignore`
+
+<Note>
+Issues that require a user to execute internal development scripts against malicious inputs outside their intended workflow, or that require modification of local configurations or files outside documented usage, may be classified as out of scope.
+</Note>
+
+## Operational Risk Assumptions
+
+Apex is an autonomous penetration testing tool designed to intentionally interact with potentially adversarial infrastructure.
+
+<Warning>
+Operators accept inherent risk when directing the tool at any target during authorized engagements.
+</Warning>
+
+### Expected Risks
+
+When conducting authorized security testing, operators may encounter:
+
+**Interaction with malicious or exploitative network services**
+- Test targets may attempt to exploit vulnerabilities in the testing tool itself
+- Services may return malicious payloads designed to compromise scanners
+- Network protocols may be intentionally violated or subverted
+
+**Exposure to intentionally malformed or hostile protocol responses**
+- HTTP responses with malicious headers or content
+- DNS responses with spoofed or malicious data
+- TLS/SSL implementations with intentional weaknesses or attacks
+- Application protocols with buffer overflows or injection attempts
+
+**Deceptive application-layer behavior from test targets**
+- Honeypots designed to detect and mislead security scanners
+- Tarpit services that slow down or trap automated testing tools
+- Applications that fingerprint and adapt to testing patterns
+- False vulnerabilities designed to waste researcher time
+
+**Attempts by targets to fingerprint, throttle, or retaliate**
+- IP reputation tracking and blocking
+- Rate limiting and behavioral analysis
+- Active retaliation against scanning infrastructure
+- Legal threats or law enforcement notification
+
+### Risk Acceptance
+
+Compromise scenarios arising from expected interaction with hostile targets — during authorized and intended usage — are considered inherent operational risk of offensive security tooling, not product vulnerabilities.
+
+**Vulnerability vs. Expected Risk:**
+- A defect in Apex's input validation that allows a malicious target to execute arbitrary code would be a vulnerability
+- A malicious target successfully fingerprinting Apex during normal operation is expected risk
+- An implementation flaw that leaks sensitive data is a vulnerability
+- A target system throttling or blocking Apex's traffic is expected risk
+
+<Note>
+Reports must demonstrate a defect in Apex's implementation that violates its documented threat model, rather than outcomes that stem from intentionally engaging adversarial systems.
+</Note>
+
+## Security Boundaries
+
+Apex maintains several critical security boundaries:
+
+### Credential Isolation
+
+- Credentials are stored encrypted in `~/.pensar/`
+- API keys and authentication tokens are not logged
+- Credentials are not transmitted except to their intended services
+- Session credentials are isolated between different testing engagements
+
+### Session Isolation
+
+- Each penetration testing session maintains separate state
+- Findings from one session do not leak into others
+- Session data is cleaned up after completion
+- Concurrent sessions operate independently
+
+### Network Boundary
+
+- Apex only connects to user-specified targets and configured AI providers
+- No telemetry or analytics are collected without explicit consent
+- Network traffic respects user-configured proxy settings
+- All external connections are intentional and documented
+
+### File System Boundary
+
+- Apex only reads/writes files in documented locations (`~/.pensar/`, current working directory for reports)
+- No automatic modification of system files or configurations
+- Report output locations are user-controlled
+- Temporary files are properly cleaned up
+
+## Deployment Contexts
+
+Security considerations vary by deployment scenario:
+
+### Local CLI Usage
+
+**Primary deployment:** Individual security researchers running Apex from their workstations.
+
+**Threat considerations:**
+- User's local machine security posture
+- Protection of stored credentials
+- Isolation from other local processes
+- Secure handling of sensitive findings
+
+### CI/CD Integration
+
+**Limited support:** Automated security scanning in build pipelines.
+
+**Threat considerations:**
+- Secure storage of API keys in CI environment
+- Isolation between different builds/jobs
+- Safe handling of findings in logs and artifacts
+- Access control to scan results
+
+### Cloud/Remote Execution
+
+**Advanced deployment:** Running Apex from cloud instances or remote servers.
+
+**Threat considerations:**
+- Network egress monitoring and attribution
+- Instance compromise from hostile targets
+- Secure credential injection
+- Safe disposal of instances with sensitive data
+
+## Severity and Impact Assessment
+
+Security severity is determined based on:
+
+**Product exposure:** Is the affected component shipped to users?
+- Vulnerabilities in shipped CLI/TUI components are higher severity
+- Issues in development-only tooling are lower severity
+- Non-distributed code has minimal product impact
+
+**Realistic attack surface:** Does the vulnerability arise during normal, intended usage?
+- Flaws exploitable during standard penetration testing workflows are in scope
+- Issues requiring unusual configuration or development-mode execution are lower priority
+- Theoretical attacks without practical exploitation paths are informational
+
+**Blast radius:** What is the scope of potential impact?
+- Credential theft or exposure: Critical
+- Arbitrary code execution in user context: High
+- Information disclosure of findings: Medium to High
+- Denial of service of Apex itself: Low to Medium
+
+**Alignment with intended usage:** Does exploitation require deviating from documented workflows?
+- Normal operation exploitation: Higher severity
+- Requires unusual flags or undocumented features: Lower severity
+- Requires source modification: Out of scope
+
+<Note>
+Local-only code execution within internal developer tooling does not automatically equate to production remote code execution. Severity classifications reflect the actual deployment context and user exposure of affected components.
+</Note>
+
+## Assumptions Outside Scope
+
+The following are explicitly outside Apex's threat model:
+
+- **Malicious local modifications:** User or attacker modifying Apex source code before execution
+- **Compromised dependencies:** Supply chain attacks on npm packages (addressed by separate tooling)
+- **Operating system vulnerabilities:** Flaws in the underlying OS or runtime (Bun)
+- **Social engineering:** Attacks that trick users into testing unauthorized targets
+- **Physical access:** Attacks requiring physical access to the user's machine
+- **Side-channel attacks:** Timing, power analysis, or other side channels
+
+## Secure Development Practices
+
+Apex is developed with security in mind:
+
+- Input validation for all user-provided data
+- Principle of least privilege in system access
+- Secure defaults for all configuration options
+- Regular dependency updates and vulnerability scanning
+- Code review for security-sensitive changes
+- Integration tests covering security boundaries
+
+For information on reporting security vulnerabilities in Apex itself, see the [Reporting](/security/reporting) page.

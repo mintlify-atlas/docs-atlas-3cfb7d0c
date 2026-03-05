@@ -1,0 +1,301 @@
+---
+title: 'Blackbox Testing'
+description: 'Learn how to perform external penetration testing against live targets without source code access'
+icon: 'shield-halved'
+---
+
+## Overview
+
+Blackbox testing with Pensar Apex simulates an **external attacker's perspective**—you only have access to the live target URL and must discover the attack surface through probing, reconnaissance, and testing from the outside.
+
+This approach is ideal for:
+- Testing deployed production or staging environments
+- Simulating real-world attack scenarios
+- Validating external security posture
+- Discovering publicly exposed vulnerabilities
+
+## Quick Start
+
+<Steps>
+  <Step title="Launch Apex">
+    Run the Apex CLI to start the interactive terminal UI:
+    ```bash
+    pensar
+    ```
+  </Step>
+
+  <Step title="Configure Target">
+    In the TUI, provide your target URL (e.g., `https://example.com` or `192.168.1.100`)
+  </Step>
+
+  <Step title="Run Pentest">
+    Apex will automatically:
+    - Perform attack surface discovery
+    - Identify endpoints, forms, and APIs
+    - Test for common vulnerabilities
+    - Generate a detailed report
+  </Step>
+</Steps>
+
+## Command Line Usage
+
+For automated workflows or CI/CD integration, use the CLI directly:
+
+```bash
+pensar pentest --target https://example.com --model claude-sonnet-4-5
+```
+
+### CLI Options
+
+| Flag | Description | Example |
+|------|-------------|----------|
+| `--target` | Target URL, domain, or IP (required) | `--target https://app.example.com` |
+| `--model` | AI model to use | `--model claude-sonnet-4-5` |
+| `--mode` | Pentest mode (e.g., `exfil` for pivoting & flag extraction) | `--mode exfil` |
+
+<CodeGroup>
+```bash Basic Pentest
+pensar pentest --target https://staging.example.com
+```
+
+```bash With Custom Model
+pensar pentest --target https://api.example.com --model claude-opus-4
+```
+
+```bash Exfiltration Mode
+pensar pentest --target https://target.com --mode exfil
+```
+</CodeGroup>
+
+## How Blackbox Testing Works
+
+### Phase 1: Attack Surface Discovery
+
+Apex uses the **BlackboxAttackSurfaceAgent** to systematically map your target's attack surface:
+
+<Steps>
+  <Step title="Initial Reconnaissance">
+    - DNS enumeration and subdomain discovery
+    - Port scanning with nmap (if available)
+    - Technology stack fingerprinting
+    - HTTP header analysis
+  </Step>
+
+  <Step title="Endpoint Discovery">
+    - Web crawling to discover pages and forms
+    - API endpoint enumeration
+    - Hidden directory discovery with gobuster
+    - Sitemap and robots.txt parsing
+  </Step>
+
+  <Step title="Asset Documentation">
+    All discovered assets are automatically documented in your session directory:
+    - `results/attack-surface.json` - Structured discovery results
+    - `assets/` - Screenshots, network traces, response bodies
+  </Step>
+</Steps>
+
+### Phase 2: Vulnerability Testing
+
+After discovering the attack surface, Apex launches targeted pentests against identified endpoints:
+
+```typescript
+// From src/core/api/attackSurface.ts
+async function runBlackboxAttackSurface(
+  input: AttackSurfaceAgentInput,
+): Promise<AttackSurfaceResult> {
+  const agent = new BlackboxAttackSurfaceAgent(input);
+
+  const { results, targets, resultsPath, assetsPath } = await agent.consume({
+    onTextDelta: (d) => input.callbacks?.onTextDelta?.(d),
+    onToolCall: (d) => input.callbacks?.onToolCall?.(d),
+    onToolResult: (d) => input.callbacks?.onToolResult?.(d),
+    onError: (e) => input.callbacks?.onError?.(e),
+  });
+
+  console.log(`\nIdentified ${targets.length} targets for deep testing`);
+  console.log(`Results: ${resultsPath}`);
+  console.log(`Assets: ${assetsPath}`);
+
+  return { results, targets, resultsPath, assetsPath };
+}
+```
+
+The agent tests for:
+- SQL injection
+- Cross-site scripting (XSS)
+- Authentication bypasses
+- Authorization flaws
+- Business logic vulnerabilities
+- API security issues
+- Configuration weaknesses
+
+## Best Practices
+
+### 1. Use Proper Scoping
+
+<Warning>
+  **Only test targets you have explicit authorization to test.** Unauthorized testing is illegal. See the [Responsible Use Disclosure](https://github.com/pensarai/apex/blob/main/RESPONSIBLE_USE.md).
+</Warning>
+
+```bash
+# Good: Testing your own staging environment
+pensar pentest --target https://staging.myapp.com
+
+# Bad: Testing a domain you don't own
+pensar pentest --target https://someone-elses-site.com  # ❌ ILLEGAL
+```
+
+### 2. Run in the Kali Container
+
+For best results, use the included Kali Linux container with pre-installed pentest tools:
+
+```bash
+cd container
+cp env.example .env  # Add your API keys
+docker compose up --build -d
+docker compose exec kali-apex bash
+pensar
+```
+
+<Note>
+  The Kali container includes nmap, gobuster, sqlmap, nikto, hydra, and other essential tools that Apex uses during blackbox testing.
+</Note>
+
+### 3. Review Output Carefully
+
+Apex saves all findings to your session directory:
+
+```bash
+~/.pensar/sessions/<session-name>/
+├── findings/          # Discovered vulnerabilities
+├── results/           # Attack surface JSON
+├── assets/            # Screenshots, traces
+├── pocs/              # Proof-of-concept exploits
+└── report.md          # Executive summary
+```
+
+### 4. Test with Authentication
+
+For authenticated testing, provide credentials during setup:
+
+```typescript
+const session = await sessions.create({
+  name: "Authenticated Blackbox Test",
+  targets: ["https://app.example.com"],
+  config: {
+    authCredentials: {
+      loginUrl: "https://app.example.com/login",
+      username: "testuser@example.com",
+      password: "TestPassword123!",
+    },
+  },
+});
+```
+
+See the [Authentication guide](/guides/authentication) for more details.
+
+## Common Scenarios
+
+### Testing a Web Application
+
+```bash
+# Full blackbox pentest of a web app
+pensar pentest --target https://webapp.example.com
+```
+
+Apex will:
+1. Crawl the site to find all pages and forms
+2. Test each form for injection vulnerabilities
+3. Check for XSS in all input fields
+4. Test authentication and session management
+5. Probe API endpoints
+6. Generate a comprehensive report
+
+### Testing an API
+
+```bash
+# Blackbox API testing
+pensar pentest --target https://api.example.com
+```
+
+Apex will:
+1. Enumerate endpoints from common paths
+2. Test authentication mechanisms
+3. Fuzz parameters for injection flaws
+4. Check for broken object level authorization (BOLA)
+5. Test rate limiting and DoS resistance
+6. Validate input validation
+
+### Testing with Subdomain Discovery
+
+For comprehensive reconnaissance:
+
+```bash
+pensar pentest --target example.com
+```
+
+Apex will:
+1. Enumerate subdomains (www, api, admin, dev, staging, etc.)
+2. Test each discovered subdomain
+3. Map relationships between services
+4. Identify the most critical attack paths
+
+## Comparing Blackbox vs Whitebox
+
+| Aspect | Blackbox | Whitebox |
+|--------|----------|----------|
+| **Source Code** | No access | Full access via `--cwd` |
+| **Discovery** | External probing | Static analysis |
+| **Speed** | Slower (network-based) | Faster (filesystem access) |
+| **Coverage** | What's exposed externally | Complete codebase |
+| **Use Case** | Production testing | Pre-deployment security review |
+
+<Note>
+  For source code analysis, see the [Whitebox Testing guide](/guides/whitebox-testing).
+</Note>
+
+## Troubleshooting
+
+### "Target is unreachable"
+
+1. Check network connectivity: `curl -I https://target.com`
+2. Verify the target URL is correct
+3. Check if a VPN or firewall is blocking access
+4. If using Docker, ensure proper network mode (see [Docker Setup](/guides/docker-setup))
+
+### "No endpoints discovered"
+
+1. The target may require authentication—provide credentials
+2. The site may be blocking automated tools—use browser-based testing
+3. Increase timeout values if the site is slow
+4. Check that the target is not a single-page app requiring JavaScript rendering
+
+### "Rate limited"
+
+Apex automatically handles rate limiting by:
+1. Detecting 429 responses
+2. Sleeping for 120 seconds
+3. Retrying the request
+4. Repeating until successful or max retries exceeded
+
+<Note>
+  Rate limiting is expected behavior for security testing. Apex will persist through temporary rate limits automatically.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Whitebox Testing" icon="code" href="/guides/whitebox-testing">
+    Learn how to test with source code access
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Configure authentication for protected targets
+  </Card>
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Set up the recommended Kali container environment
+  </Card>
+  <Card title="vLLM Setup" icon="server" href="/guides/vllm-setup">
+    Run Apex with local models for offline testing
+  </Card>
+</CardGroup>

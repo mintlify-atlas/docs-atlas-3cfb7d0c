@@ -1,0 +1,443 @@
+---
+title: Installation
+description: Install Pensar Apex using npm, Homebrew, or installation scripts on macOS, Linux, and Windows
+---
+
+# Installation
+
+Pensar Apex can be installed using multiple methods depending on your platform and preferences. Choose the installation method that best suits your workflow.
+
+## Prerequisites
+
+Before installing Pensar Apex, ensure you have:
+
+<Steps>
+  <Step title="API Key">
+    An API key from one of the supported AI providers:
+    - [Anthropic](https://console.anthropic.com/) (Recommended)
+    - [OpenAI](https://platform.openai.com/)
+    - [OpenRouter](https://openrouter.ai/)
+    - AWS Bedrock access
+    - Or a local vLLM server
+  </Step>
+  
+  <Step title="System Requirements">
+    - **Node.js** 18.0.0 or higher (for npm installation)
+    - **Bun** 1.0.0 or higher (alternative runtime)
+    - Internet connection for AI model access
+  </Step>
+</Steps>
+
+<Note>
+  After installation, run `pensar doctor` to check for optional dependencies like `nmap` and install additional penetration testing tools.
+</Note>
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="Quick Install (macOS/Linux)">
+    The fastest way to install Pensar Apex on macOS and Linux:
+
+    ```bash
+    curl -fsSL https://pensarai.com/install.sh | bash
+    ```
+
+    This script will:
+    - Detect your system architecture
+    - Download the appropriate binary
+    - Install it to `/usr/local/bin/pensar`
+    - Make it executable and add to PATH
+
+    <Accordion title="What does the install script do?">
+      The installation script:
+      1. Detects your operating system and architecture (arm64/x64)
+      2. Downloads the latest compiled binary from the release server
+      3. Installs the binary to `/usr/local/bin/` (requires sudo)
+      4. Sets executable permissions
+      5. Verifies the installation by running `pensar version`
+      
+      The script is safe to review before running:
+      ```bash
+      curl -fsSL https://pensarai.com/install.sh
+      ```
+    </Accordion>
+  </Tab>
+
+  <Tab title="Homebrew (macOS/Linux)">
+    Install using Homebrew package manager:
+
+    ```bash
+    brew tap pensarai/tap
+    brew install apex
+    ```
+
+    To upgrade Pensar Apex later:
+    ```bash
+    brew upgrade pensarai/tap/apex
+    ```
+
+    <Note>
+      Homebrew installation includes automatic dependency management and easier version upgrades.
+    </Note>
+  </Tab>
+
+  <Tab title="npm (Cross-platform)">
+    Install globally using npm:
+
+    ```bash
+    npm install -g @pensar/apex
+    ```
+
+    Or using yarn:
+    ```bash
+    yarn global add @pensar/apex
+    ```
+
+    Or using pnpm:
+    ```bash
+    pnpm add -g @pensar/apex
+    ```
+
+    To upgrade:
+    ```bash
+    npm update -g @pensar/apex
+    ```
+
+    <Accordion title="npm installation requirements">
+      - Node.js 18.0.0 or higher
+      - npm, yarn, or pnpm package manager
+      - Write permissions for global packages directory
+      
+      If you encounter permission errors, consider using:
+      ```bash
+      sudo npm install -g @pensar/apex
+      ```
+      
+      Or configure npm to use a user-owned directory for global packages.
+    </Accordion>
+  </Tab>
+
+  <Tab title="Windows (PowerShell)">
+    Install on Windows using PowerShell:
+
+    ```powershell
+    irm https://pensarai.com/apex.ps1 | iex
+    ```
+
+    <Warning>
+      You may need to run PowerShell as Administrator for the installation to complete successfully.
+    </Warning>
+
+    Alternatively, use npm on Windows:
+    ```powershell
+    npm install -g @pensar/apex
+    ```
+
+    <Accordion title="Windows installation notes">
+      - The PowerShell script downloads and installs the Windows binary
+      - Adds Pensar Apex to your PATH automatically
+      - May require Windows Defender or antivirus approval
+      - For WSL2 users, use the Linux installation method instead
+    </Accordion>
+  </Tab>
+</Tabs>
+
+## Verify Installation
+
+After installation, verify that Pensar Apex is installed correctly:
+
+```bash
+pensar version
+```
+
+<CodeGroup>
+```bash Output
+v0.0.79
+```
+</CodeGroup>
+
+You should see the version number displayed. If you see an error, ensure that the installation directory is in your system PATH.
+
+## Configuration
+
+### Set Up AI Provider API Key
+
+Pensar Apex requires an AI provider API key to function. Set your API key as an environment variable:
+
+<CodeGroup>
+```bash Anthropic (Recommended)
+export ANTHROPIC_API_KEY="your-api-key-here"
+```
+
+```bash OpenAI
+export OPENAI_API_KEY="your-api-key-here"
+```
+
+```bash OpenRouter
+export OPENROUTER_API_KEY="your-api-key-here"
+```
+
+```bash AWS Bedrock (Bearer Token)
+export BEDROCK_API_KEY="your-bearer-token"
+export AWS_REGION="us-east-1"
+```
+
+```bash AWS Bedrock (IAM Credentials)
+export AWS_ACCESS_KEY_ID="your-access-key-id"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_SESSION_TOKEN="your-session-token"  # optional
+export AWS_REGION="us-east-1"
+```
+
+```bash vLLM (Local Models)
+export LOCAL_MODEL_URL="http://localhost:8000/v1"
+```
+</CodeGroup>
+
+<Note>
+  To make these environment variables persistent, add them to your shell configuration file (`~/.bashrc`, `~/.zshrc`, or `~/.profile`).
+</Note>
+
+### First Launch
+
+On first launch, Pensar Apex will:
+
+1. Display the **Responsible Use Disclosure** (press Enter to accept)
+2. If no API key is configured, route to the **Provider Manager** screen
+3. Create a configuration directory at `~/.pensar/`
+
+Launch the interactive TUI:
+
+```bash
+pensar
+```
+
+The TUI will guide you through the initial setup if needed.
+
+## Post-Install Setup with `pensar doctor`
+
+After installation, run the diagnostic tool to check your environment and install recommended dependencies:
+
+```bash
+pensar doctor
+```
+
+<CodeGroup>
+```bash Example Output
+Pensar Doctor
+=============
+
+System Tools
+------------
+  ✗ nmap — not found (recommended for network scanning)
+
+AI Providers
+------------
+  ✓ Anthropic
+  · OpenAI
+  · OpenRouter
+  · AWS Bedrock
+  · AWS IAM
+  · vLLM (local)
+
+Install nmap via Homebrew? (brew install nmap) [y/N]
+```
+</CodeGroup>
+
+### What `pensar doctor` Checks
+
+<AccordionGroup>
+  <Accordion title="System Tools">
+    - **nmap**: Network scanning and port enumeration tool (highly recommended)
+    - Offers to install nmap automatically if a supported package manager is detected
+  </Accordion>
+
+  <Accordion title="AI Providers">
+    Checks which AI provider API keys are configured:
+    - Anthropic (`ANTHROPIC_API_KEY`)
+    - OpenAI (`OPENAI_API_KEY`)
+    - OpenRouter (`OPENROUTER_API_KEY`)
+    - AWS Bedrock (`BEDROCK_API_KEY` or IAM credentials)
+    - vLLM local model (`LOCAL_MODEL_URL`)
+  </Accordion>
+</AccordionGroup>
+
+### Installing nmap
+
+The `pensar doctor` command can automatically install nmap on supported systems:
+
+<CodeGroup>
+```bash macOS (Homebrew)
+brew install nmap
+```
+
+```bash Ubuntu/Debian
+sudo apt-get update && sudo apt-get install -y nmap
+```
+
+```bash Fedora/RHEL
+sudo dnf install -y nmap
+```
+
+```bash Arch Linux
+sudo pacman -S --noconfirm nmap
+```
+</CodeGroup>
+
+<Warning>
+  While nmap is optional, it is **highly recommended** for comprehensive network scanning capabilities during blackbox penetration testing.
+</Warning>
+
+## Kali Linux Container (Recommended)
+
+For the **best pentesting experience**, run Pensar Apex in the included Kali Linux container with all security tools preconfigured:
+
+<Steps>
+  <Step title="Navigate to Container Directory">
+    ```bash
+    cd container
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    ```bash
+    cp env.example .env
+    # Edit .env and add your API keys
+    ```
+  </Step>
+
+  <Step title="Build and Start Container">
+    ```bash
+    docker compose up --build -d
+    ```
+  </Step>
+
+  <Step title="Access Container">
+    ```bash
+    docker compose exec kali-apex bash
+    ```
+  </Step>
+
+  <Step title="Run Pensar Inside Container">
+    ```bash
+    pensar
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  **Linux users**: For comprehensive network scanning, consider using `network_mode: host` in `docker-compose.yml` to allow the container direct access to your network interfaces.
+</Note>
+
+## Upgrading Pensar Apex
+
+To upgrade to the latest version, use the built-in upgrade command:
+
+```bash
+pensar upgrade
+```
+
+<CodeGroup>
+```bash Example Output
+Current version: v0.0.79
+Checking for updates...
+
+Upgraded from v0.0.79 to v0.0.80. Please restart pensar.
+```
+</CodeGroup>
+
+The `upgrade` command automatically detects your installation method and uses the appropriate upgrade mechanism:
+
+- **npm**: `npm install -g @pensar/apex@latest`
+- **Homebrew**: `brew upgrade pensarai/tap/apex`
+- **Binary**: Re-downloads from `https://pensarai.com/install.sh`
+
+<Accordion title="Manual upgrade methods">
+  Depending on your installation method:
+
+  **npm:**
+  ```bash
+  npm update -g @pensar/apex
+  ```
+
+  **Homebrew:**
+  ```bash
+  brew upgrade pensarai/tap/apex
+  ```
+
+  **Binary (macOS/Linux):**
+  ```bash
+  curl -fsSL https://pensarai.com/install.sh | bash
+  ```
+
+  **Windows (PowerShell):**
+  ```powershell
+  irm https://pensarai.com/apex.ps1 | iex
+  ```
+</Accordion>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command not found: pensar">
+    The installation directory is not in your PATH.
+
+    **Solution:**
+    1. Check where pensar was installed:
+       ```bash
+       which pensar
+       ```
+    2. Add the directory to your PATH in `~/.bashrc` or `~/.zshrc`:
+       ```bash
+       export PATH="$PATH:/usr/local/bin"
+       ```
+    3. Reload your shell configuration:
+       ```bash
+       source ~/.bashrc  # or ~/.zshrc
+       ```
+  </Accordion>
+
+  <Accordion title="Permission denied during installation">
+    Insufficient permissions to install to system directories.
+
+    **Solution:**
+    - Run installation with `sudo` (be cautious)
+    - Use npm with user-owned global directory
+    - Install via Homebrew which handles permissions automatically
+  </Accordion>
+
+  <Accordion title="No AI provider configured">
+    Missing or incorrect API key configuration.
+
+    **Solution:**
+    1. Set your API key environment variable:
+       ```bash
+       export ANTHROPIC_API_KEY="your-key"
+       ```
+    2. Verify it's set:
+       ```bash
+       echo $ANTHROPIC_API_KEY
+       ```
+    3. Run `pensar doctor` to confirm configuration
+  </Accordion>
+
+  <Accordion title="nmap not found">
+    nmap is not installed on your system.
+
+    **Solution:**
+    Run `pensar doctor` and follow the prompts to install nmap automatically, or install manually:
+    ```bash
+    # macOS
+    brew install nmap
+    
+    # Ubuntu/Debian
+    sudo apt-get install nmap
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+  Learn how to run your first penetration test with Pensar Apex
+</Card>

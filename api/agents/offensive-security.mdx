@@ -1,0 +1,374 @@
+---
+title: "OffensiveSecurityAgent"
+description: "General-purpose offensive security agent harness for penetration testing operations"
+---
+
+## Overview
+
+The `OffensiveSecurityAgent` is the core agent harness that powers all specialized agents in Pensar Apex. It handles tool creation, stream management, and result resolution, allowing specialized agents to focus solely on their domain-specific logic.
+
+The agent owns tool creation — all available tools are built from the session context, and specific agents select which ones to activate via the `activeTools` array.
+
+The stream starts **immediately on construction** — no need to call a separate `.run()` method.
+
+## Key Features
+
+- **Automatic Tool Management**: Creates and manages all available tools from session context
+- **Streaming by Default**: Stream starts immediately on construction
+- **Flexible Consumption**: Multiple ways to consume the stream (callbacks, async iteration, raw stream)
+- **Type-Safe Results**: Generic type parameter `TResult` for typed return values
+- **Approval Gate Integration**: Optional approval gate for human-in-the-loop operations
+- **Credential Management**: Automatic credential resolution without exposing secrets to the model
+
+## Constructor
+
+```typescript
+new OffensiveSecurityAgent<TResult>(input: OffensiveSecurityAgentInput<TResult>)
+```
+
+<ParamField path="input" type="OffensiveSecurityAgentInput<TResult>" required>
+  Configuration object for the agent
+</ParamField>
+
+### OffensiveSecurityAgentInput
+
+<ParamField path="system" type="string" required>
+  System prompt defining agent persona and behavior
+</ParamField>
+
+<ParamField path="prompt" type="string" required>
+  Initial user prompt that kicks off the agent
+</ParamField>
+
+<ParamField path="model" type="AIModel" required>
+  AI model identifier (e.g., `"claude-sonnet-4-20250514"`)
+</ParamField>
+
+<ParamField path="session" type="SessionInfo" required>
+  Session providing paths for findings, POCs, logs, etc.
+</ParamField>
+
+<ParamField path="activeTools" type="(ToolName | string)[]" required>
+  Which tools the agent is allowed to use. Accepts both built-in tool names and custom tool names from `extraTools`.
+</ParamField>
+
+<ParamField path="target" type="string">
+  The target URL / host — passed to browser tools for context
+</ParamField>
+
+<ParamField path="extraTools" type="ToolSet">
+  Additional tools to merge into the toolset. Use this to inject agent-specific tools without modifying the shared tool registry.
+</ParamField>
+
+<ParamField path="messages" type="Array<ModelMessage>">
+  Existing conversation history (for resumption / multi-turn)
+</ParamField>
+
+<ParamField path="stopWhen" type="StopCondition<ToolSet> | StopCondition<ToolSet>[]">
+  Condition(s) under which the agent should stop
+</ParamField>
+
+<ParamField path="toolChoice" type="ToolChoice<ToolSet>">
+  Strategy for selecting which tool to call
+</ParamField>
+
+<ParamField path="onStepFinish" type="StreamTextOnStepFinishCallback<ToolSet>">
+  Callback fired after each agent step completes
+</ParamField>
+
+<ParamField path="onFinish" type="StreamTextOnFinishCallback<ToolSet>">
+  Callback fired when the entire stream finishes
+</ParamField>
+
+<ParamField path="abortSignal" type="AbortSignal">
+  AbortSignal to cancel the agent mid-run
+</ParamField>
+
+<ParamField path="authConfig" type="AIAuthConfig">
+  Per-provider API key overrides
+</ParamField>
+
+<ParamField path="sandbox" type="UnifiedSandbox">
+  When set, tools like execute_command / http_request / create_poc route execution through this sandbox instead of running locally
+</ParamField>
+
+<ParamField path="findingsRegistry" type="FindingsRegistry">
+  Shared findings registry for cross-agent dedup. When present, `document_vulnerability` checks for duplicates before writing.
+</ParamField>
+
+<ParamField path="credentialManager" type="CredentialManager">
+  In-memory credential store. When present, tools resolve credential IDs to secrets at execution time — the agent never sees raw passwords or tokens.
+</ParamField>
+
+<ParamField path="resolveResult" type="(streamResult: StreamTextResult<ToolSet, never>) => TResult | Promise<TResult>">
+  Called after the stream is fully consumed to produce a typed result. If omitted, `consume()` returns `void`.
+</ParamField>
+
+<ParamField path="responseSchema" type="z.ZodSchema">
+  Zod schema for structured output via the `response` tool. When provided, the base class automatically creates and injects a `response` tool, merges `hasToolCall("response")` into stop conditions, and defaults `resolveResult` to return the captured structured data.
+</ParamField>
+
+<ParamField path="approvalGate" type="ApprovalGate">
+  When provided, each tool call is gated through the approval gate. The gate will pause execution until the operator approves or denies the call.
+</ParamField>
+
+<ParamField path="subagentId" type="string">
+  Identifier for this agent when running as a subagent
+</ParamField>
+
+<ParamField path="subagentCallbacks" type="SubagentConsumeCallbacks">
+  Callbacks for forwarding subagent stream events to the parent consumer
+</ParamField>
+
+<ParamField path="callbacks" type="ConsumeCallbacks">
+  Callbacks for persisting agent discoveries to external storage (e.g., database)
+</ParamField>
+
+## Methods
+
+### consume()
+
+Consume the stream with typed callbacks, then resolve the final result.
+
+```typescript
+async consume(callbacks?: ConsumeCallbacks): Promise<TResult>
+```
+
+<ParamField path="callbacks" type="ConsumeCallbacks">
+  Optional callbacks for stream events
+</ParamField>
+
+<ResponseField name="TResult" type="TResult">
+  The value produced by `resolveResult`, or `void` if none was provided
+</ResponseField>
+
+#### ConsumeCallbacks
+
+<ParamField path="onTextDelta" type="(delta: TextStreamPart) => void">
+  Called when text is streamed from the model
+</ParamField>
+
+<ParamField path="onToolCall" type="(delta: ToolCallPart) => void">
+  Called when a tool is invoked
+</ParamField>
+
+<ParamField path="onToolResult" type="(delta: ToolResultPart) => void">
+  Called when a tool returns a result
+</ParamField>
+
+<ParamField path="onError" type="(error: unknown) => void">
+  Called when an error occurs
+</ParamField>
+
+<ParamField path="subagentCallbacks" type="SubagentConsumeCallbacks">
+  Callbacks for forwarding subagent events
+</ParamField>
+
+## Properties
+
+### streamResult
+
+The underlying Vercel AI SDK stream result — escape hatch for advanced use.
+
+```typescript
+readonly streamResult: StreamTextResult<ToolSet, never>
+```
+
+### fullStream
+
+The raw async-iterable stream of chunks. Equivalent to `streamResult.fullStream`.
+
+```typescript
+get fullStream(): AsyncIterable<TextStreamPart<ToolSet>>
+```
+
+### response
+
+Promise that resolves to the final response metadata once the stream has been fully consumed.
+
+```typescript
+get response(): Promise<ResponseMetadata>
+```
+
+## Usage Examples
+
+### Basic Usage with Callbacks
+
+```typescript
+import { OffensiveSecurityAgent } from "@pensar/apex";
+
+const agent = new OffensiveSecurityAgent({
+  system: "You are a penetration testing agent...",
+  prompt: "Scan the target for vulnerabilities",
+  model: "claude-sonnet-4-20250514",
+  session,
+  target: "https://example.com",
+  activeTools: [
+    "execute_command",
+    "http_request",
+    "document_vulnerability",
+  ],
+});
+
+const result = await agent.consume({
+  onTextDelta: (delta) => {
+    process.stdout.write(delta.text);
+  },
+  onToolCall: (delta) => {
+    console.log(`→ Calling ${delta.toolName}`);
+  },
+  onToolResult: (delta) => {
+    console.log(`✓ ${delta.toolName} completed`);
+  },
+});
+```
+
+### Async Iteration
+
+```typescript
+const agent = new OffensiveSecurityAgent({
+  system: "You are a penetration testing agent...",
+  prompt: "Enumerate subdomains",
+  model: "claude-sonnet-4-20250514",
+  session,
+  target: "example.com",
+  activeTools: ["execute_command"],
+});
+
+for await (const chunk of agent) {
+  if (chunk.type === "text-delta") {
+    process.stdout.write(chunk.text);
+  } else if (chunk.type === "tool-call") {
+    console.log(`→ ${chunk.toolName}`);
+  }
+}
+```
+
+### With Structured Output
+
+```typescript
+import { z } from "zod";
+
+const ScanResultSchema = z.object({
+  summary: z.string(),
+  vulnerabilitiesFound: z.number(),
+  recommendations: z.array(z.string()),
+});
+
+const agent = new OffensiveSecurityAgent<z.infer<typeof ScanResultSchema>>({
+  system: "You are a penetration testing agent...",
+  prompt: "Scan and report findings",
+  model: "claude-sonnet-4-20250514",
+  session,
+  target: "https://example.com",
+  activeTools: ["execute_command", "http_request", "response"],
+  responseSchema: ScanResultSchema,
+});
+
+const result = await agent.consume({
+  onTextDelta: (delta) => process.stdout.write(delta.text),
+});
+
+console.log(`Found ${result.vulnerabilitiesFound} vulnerabilities`);
+console.log(`Recommendations: ${result.recommendations.join(", ")}`);
+```
+
+### With Approval Gate
+
+```typescript
+import { ApprovalGate } from "@pensar/apex";
+
+const gate = new ApprovalGate({
+  requireApproval: true,
+  approvalHandler: async (toolName, args) => {
+    // Custom approval logic
+    const approved = await promptUser(`Approve ${toolName}?`);
+    return approved;
+  },
+});
+
+const agent = new OffensiveSecurityAgent({
+  system: "You are a penetration testing agent...",
+  prompt: "Test for SQL injection",
+  model: "claude-sonnet-4-20250514",
+  session,
+  target: "https://example.com",
+  activeTools: ["execute_command", "http_request"],
+  approvalGate: gate,
+});
+
+const result = await agent.consume();
+```
+
+### With Credential Manager
+
+```typescript
+import { CredentialManager } from "@pensar/apex";
+
+const credentialManager = new CredentialManager();
+credentialManager.addCredential({
+  id: "cred_1",
+  username: "admin",
+  password: "secret123",
+  loginUrl: "https://example.com/login",
+});
+
+const agent = new OffensiveSecurityAgent({
+  system: "You are a penetration testing agent...",
+  prompt: "Test authenticated endpoints",
+  model: "claude-sonnet-4-20250514",
+  session,
+  target: "https://example.com",
+  activeTools: ["execute_command", "http_request", "browser_navigate"],
+  credentialManager,
+});
+
+const result = await agent.consume({
+  onTextDelta: (delta) => process.stdout.write(delta.text),
+});
+```
+
+## Consumption Patterns
+
+The agent stream can be consumed in three ways:
+
+<Tabs>
+  <Tab title="Typed Callbacks">
+    ```typescript
+    const result = await agent.consume({
+      onTextDelta: (d) => process.stdout.write(d.text),
+      onToolCall: (d) => console.log(`→ ${d.toolName}`),
+    });
+    ```
+  </Tab>
+  <Tab title="Async Iteration">
+    ```typescript
+    for await (const chunk of agent) {
+      // Process chunk
+    }
+    ```
+  </Tab>
+  <Tab title="Raw Stream">
+    ```typescript
+    for await (const chunk of agent.fullStream) {
+      // Process chunk
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The underlying stream can only be consumed once. Choose one consumption pattern per agent instance.
+</Note>
+
+## Type Parameters
+
+<ParamField path="TResult" type="any" default="void">
+  The type returned by `consume()`. When the input includes a `resolveResult` function, `consume()` awaits it after the stream finishes and returns the value.
+</ParamField>
+
+## Related
+
+- [BlackboxAttackSurfaceAgent](/api/agents/attack-surface)
+- [TargetedPentestAgent](/api/agents/pentest)
+- [AuthenticationAgent](/api/agents/authentication)

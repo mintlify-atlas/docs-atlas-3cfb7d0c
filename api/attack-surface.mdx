@@ -1,0 +1,330 @@
+---
+title: Attack Surface
+description: Discover and map the attack surface of a target system
+icon: radar
+---
+
+## Overview
+
+The Attack Surface API provides comprehensive reconnaissance and attack surface mapping capabilities for both blackbox and whitebox testing scenarios.
+
+**Key Features:**
+- Automatic mode selection based on input (whitebox vs blackbox)
+- Asset discovery and enumeration
+- Endpoint and page detection
+- Authentication flow mapping
+- Target prioritization for deep testing
+
+---
+
+## runAttackSurfaceAgent
+
+Run the appropriate attack surface agent based on the input configuration.
+
+**Behavior:**
+- If `cwd` is provided, runs the **whitebox** agent which analyzes source code directly to map endpoints and pages
+- Otherwise, runs the **blackbox** agent which probes a live target from the outside
+- `target` is always required (the live URL to test against)
+
+```typescript
+import { runAttackSurfaceAgent } from '@pensar/apex/api/attackSurface';
+
+const result = await runAttackSurfaceAgent({
+  target: 'https://example.com',
+  model: 'claude-sonnet-4-20250514',
+  session: sessionInfo,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text),
+    onToolCall: (d) => console.log(`→ calling ${d.toolName}`),
+    onToolResult: (d) => console.log(`✓ ${d.toolName} completed`),
+  },
+});
+
+console.log(`Identified ${result.targets.length} targets`);
+```
+
+### Parameters
+
+<ParamField path="input" type="AttackSurfaceAgentInput" required>
+  Configuration for the attack surface agent
+
+  <Expandable title="AttackSurfaceAgentInput properties">
+    <ParamField path="target" type="string" required>
+      The target to analyze (domain, IP, URL, network range, or org name)
+    </ParamField>
+
+    <ParamField path="cwd" type="string">
+      Working directory for source-code based analysis. When provided, enables whitebox mode.
+    </ParamField>
+
+    <ParamField path="model" type="AIModel" required>
+      AI model identifier (e.g., `"claude-sonnet-4-20250514"`)
+    </ParamField>
+
+    <ParamField path="session" type="SessionInfo" required>
+      Session object providing paths for findings, POCs, logs, etc.
+    </ParamField>
+
+    <ParamField path="authConfig" type="AIAuthConfig">
+      Optional per-provider API key overrides
+    </ParamField>
+
+    <ParamField path="abortSignal" type="AbortSignal">
+      AbortSignal to cancel the agent mid-run
+    </ParamField>
+
+    <ParamField path="callbacks" type="ConsumeCallbacks">
+      Stream event callbacks for monitoring agent progress
+      
+      <Expandable title="ConsumeCallbacks properties">
+        <ParamField path="onTextDelta" type="(delta) => void">
+          Called for each text chunk streamed from the AI
+        </ParamField>
+        
+        <ParamField path="onToolCall" type="(delta) => void">
+          Called when the agent invokes a tool
+        </ParamField>
+        
+        <ParamField path="onToolResult" type="(delta) => void">
+          Called when a tool execution completes
+        </ParamField>
+        
+        <ParamField path="onError" type="(error) => void">
+          Called when an error occurs
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="onStepFinish" type="StreamTextOnStepFinishCallback">
+      Callback fired after each agent step completes
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Response
+
+<ResponseField name="results" type="AttackSurfaceAnalysisResults | WhiteboxAttackSurfaceResult | null">
+  The full analysis results with discovered assets and key findings
+  
+  <Expandable title="AttackSurfaceAnalysisResults (Blackbox)">
+    <ResponseField name="summary" type="AttackSurfaceSummary">
+      High-level statistics about the analysis
+      
+      <Expandable title="properties">
+        <ResponseField name="totalAssets" type="number">
+          Total number of assets discovered
+        </ResponseField>
+        <ResponseField name="totalDomains" type="number">
+          Total number of domains found
+        </ResponseField>
+        <ResponseField name="highValueTargets" type="number">
+          Count of high-priority targets
+        </ResponseField>
+        <ResponseField name="analysisComplete" type="boolean">
+          Whether the analysis completed successfully
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="discoveredAssets" type="string[]">
+      List of all discovered assets (servers, services, endpoints)
+    </ResponseField>
+    
+    <ResponseField name="targets" type="PentestTarget[]">
+      Prioritized targets for deep penetration testing
+    </ResponseField>
+    
+    <ResponseField name="keyFindings" type="string[]">
+      Notable security observations from reconnaissance
+    </ResponseField>
+  </Expandable>
+  
+  <Expandable title="WhiteboxAttackSurfaceResult (Whitebox)">
+    <ResponseField name="apps" type="App[]">
+      All applications/services discovered in the codebase
+      
+      <Expandable title="App properties">
+        <ResponseField name="name" type="string">
+          Application or service name
+        </ResponseField>
+        <ResponseField name="framework" type="string">
+          Framework in use (e.g., Express, Next.js, Django)
+        </ResponseField>
+        <ResponseField name="description" type="string">
+          Brief description of the app
+        </ResponseField>
+        <ResponseField name="location" type="string">
+          Path to the app root
+        </ResponseField>
+        <ResponseField name="pages" type="Endpoint[]">
+          Web pages and routes
+        </ResponseField>
+        <ResponseField name="apiEndpoints" type="Endpoint[]">
+          API endpoints
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="summary" type="object">
+      Statistics about the whitebox analysis
+      
+      <Expandable title="properties">
+        <ResponseField name="totalApps" type="number">
+          Number of apps found
+        </ResponseField>
+        <ResponseField name="totalPages" type="number">
+          Total web pages
+        </ResponseField>
+        <ResponseField name="totalApiEndpoints" type="number">
+          Total API endpoints
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="targets" type="PentestTarget[]">
+  All targets identified for deep penetration testing
+  
+  <Expandable title="PentestTarget properties">
+    <ResponseField name="target" type="string">
+      The URL or endpoint to test
+    </ResponseField>
+    
+    <ResponseField name="objective" type="string">
+      Testing objective for this target
+    </ResponseField>
+    
+    <ResponseField name="rationale" type="string">
+      Why this target was prioritized
+    </ResponseField>
+    
+    <ResponseField name="authenticationInfo" type="object">
+      Authentication details if applicable
+      
+      <Expandable title="properties">
+        <ResponseField name="method" type="string">
+          Authentication method
+        </ResponseField>
+        <ResponseField name="details" type="string">
+          Additional auth details
+        </ResponseField>
+        <ResponseField name="credentials" type="string">
+          Credential reference ID
+        </ResponseField>
+        <ResponseField name="cookies" type="string">
+          Session cookies
+        </ResponseField>
+        <ResponseField name="headers" type="string">
+          Required headers
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="resultsPath" type="string">
+  Absolute path to the attack-surface-results.json file
+</ResponseField>
+
+<ResponseField name="assetsPath" type="string">
+  Absolute path to the session's assets directory
+</ResponseField>
+
+---
+
+## Usage Examples
+
+<CodeGroup>
+
+```typescript Blackbox Testing
+import { runAttackSurfaceAgent } from '@pensar/apex/api/attackSurface';
+import { createSession } from '@pensar/apex/session';
+
+// Create session
+const session = await createSession({
+  name: 'Target Recon',
+  targets: ['https://example.com'],
+});
+
+// Run blackbox attack surface analysis
+const result = await runAttackSurfaceAgent({
+  target: 'https://example.com',
+  model: 'claude-sonnet-4-20250514',
+  session,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text),
+    onToolCall: (d) => console.log(`→ ${d.toolName}`),
+  },
+});
+
+console.log(`Found ${result.targets.length} targets`);
+console.log(`Results saved to: ${result.resultsPath}`);
+```
+
+```typescript Whitebox Testing
+import { runAttackSurfaceAgent } from '@pensar/apex/api/attackSurface';
+import { createSession } from '@pensar/apex/session';
+
+// Create session
+const session = await createSession({
+  name: 'Codebase Analysis',
+  targets: ['https://staging.example.com'],
+});
+
+// Run whitebox attack surface analysis
+const result = await runAttackSurfaceAgent({
+  target: 'https://staging.example.com',
+  cwd: '/path/to/project',  // Enables whitebox mode
+  model: 'claude-sonnet-4-20250514',
+  session,
+});
+
+if ('apps' in result) {
+  console.log(`Analyzed ${result.summary.totalApps} applications`);
+  console.log(`Found ${result.summary.totalApiEndpoints} API endpoints`);
+}
+```
+
+```typescript With Authentication
+import { runAttackSurfaceAgent } from '@pensar/apex/api/attackSurface';
+import { createSession } from '@pensar/apex/session';
+
+// Create session with credentials
+const session = await createSession({
+  name: 'Authenticated Scan',
+  targets: ['https://app.example.com'],
+  config: {
+    authCredentials: {
+      username: 'testuser',
+      password: 'testpass',
+      loginUrl: 'https://app.example.com/login',
+    },
+  },
+});
+
+// Agent will automatically authenticate before scanning
+const result = await runAttackSurfaceAgent({
+  target: 'https://app.example.com',
+  model: 'claude-sonnet-4-20250514',
+  session,
+});
+```
+
+</CodeGroup>
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Pentest" icon="shield-halved" href="/api/blackbox-pentest">
+    Full penetration testing workflow
+  </Card>
+  <Card title="Targeted Pentest" icon="bullseye" href="/api/targeted-pentest">
+    Test specific targets and objectives
+  </Card>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Authenticate against a target
+  </Card>
+</CardGroup>

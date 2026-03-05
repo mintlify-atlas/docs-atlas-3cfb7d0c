@@ -1,0 +1,345 @@
+---
+title: "Model Selection"
+description: "Choose the right AI model for your penetration testing needs"
+---
+
+Pensar Apex supports multiple AI models from different providers. Model selection impacts testing quality, speed, and cost.
+
+## Default Model
+
+The default model is **`claude-sonnet-4-5`** (Anthropic Claude 4.5 Sonnet), which provides:
+
+- Excellent reasoning for security analysis
+- Tool use capability for pentest actions
+- Large context window (200k tokens)
+- Good balance of performance and cost
+
+<Tip>
+For most pentesting scenarios, the default model provides excellent results. Only change if you have specific requirements.
+</Tip>
+
+## Selecting a Model
+
+### Via Command Line
+
+Specify the model with the `--model` flag:
+
+```bash
+pensar pentest --target https://example.com --model claude-opus-4
+```
+
+### Via TUI
+
+1. Launch the TUI: `pensar`
+2. Navigate to **Models** screen
+3. Select from available models or enter a custom model name
+4. The selection persists in `~/.pensar/config.json`
+
+### Programmatic API
+
+Set the model in your code:
+
+```typescript
+import { runPentestAgent } from '@pensar/apex';
+
+const result = await runPentestAgent({
+  target: 'https://example.com',
+  model: 'claude-sonnet-4-5',
+  // ... other options
+});
+```
+
+## Recommended Models by Provider
+
+<Tabs>
+  <Tab title="Anthropic (Recommended)">
+    ### Claude 4.5 Sonnet (Default)
+    ```bash
+    --model claude-sonnet-4-5
+    ```
+    **Best for:** Most pentesting scenarios  
+    **Context:** 200k tokens  
+    **Strengths:** Excellent reasoning, tool use, security analysis
+
+    ### Claude 4 Opus
+    ```bash
+    --model claude-opus-4
+    ```
+    **Best for:** Complex targets, advanced exploitation  
+    **Context:** 200k tokens  
+    **Strengths:** Maximum reasoning capability, handles complex chains
+
+    ### Claude 3.5 Sonnet
+    ```bash
+    --model claude-sonnet-3-5
+    ```
+    **Best for:** Budget-conscious testing  
+    **Context:** 200k tokens  
+    **Strengths:** Previous generation, still highly capable
+  </Tab>
+
+  <Tab title="OpenAI">
+    ### GPT-4
+    ```bash
+    --model gpt-4
+    ```
+    **Best for:** General testing when Anthropic unavailable  
+    **Context:** 128k tokens  
+    **Strengths:** Good reasoning, wide knowledge
+
+    ### GPT-4 Turbo
+    ```bash
+    --model gpt-4-turbo
+    ```
+    **Best for:** Faster, cost-effective alternative  
+    **Context:** 128k tokens  
+    **Strengths:** Lower latency than GPT-4
+
+    <Warning>
+    GPT models may not perform as well as Claude for security testing. Use Anthropic when possible.
+    </Warning>
+  </Tab>
+
+  <Tab title="AWS Bedrock">
+    ### Claude on Bedrock
+    ```bash
+    --model anthropic.claude-sonnet-4-5
+    ```
+    **Best for:** Enterprise AWS deployments  
+    **Strengths:** Same Claude quality with AWS security/compliance
+
+    ### Llama 3.1 70B
+    ```bash
+    --model meta.llama3-70b
+    ```
+    **Best for:** Open-source preference  
+    **Strengths:** Good reasoning, no vendor lock-in
+
+    <Note>
+    Model IDs on Bedrock use provider prefixes (e.g., `anthropic.`, `meta.`). Check AWS docs for your region.
+    </Note>
+  </Tab>
+
+  <Tab title="OpenRouter">
+    ### Anthropic via OpenRouter
+    ```bash
+    --model anthropic/claude-sonnet-4-5
+    ```
+    **Best for:** Single API for multiple providers  
+    **Strengths:** Access to latest models across providers
+
+    ### Other Models
+    - `openai/gpt-4`
+    - `google/gemini-pro`
+    - `meta-llama/llama-3-70b`
+
+    See [openrouter.ai/models](https://openrouter.ai/models) for complete list.
+  </Tab>
+
+  <Tab title="Local (vLLM)">
+    ### Llama 3.1 70B Instruct
+    ```bash
+    export LOCAL_MODEL_URL="http://localhost:8000/v1"
+    pensar pentest --target https://example.com --model meta-llama/Llama-3.1-70B-Instruct
+    ```
+    **Best for:** Complete data privacy, offline scenarios  
+    **Strengths:** No data leaves your infrastructure
+
+    ### DeepSeek Coder
+    ```bash
+    --model deepseek-ai/deepseek-coder-33b-instruct
+    ```
+    **Best for:** Code-heavy whitebox testing  
+    **Strengths:** Specialized in code understanding
+
+    <Warning>
+    Local models may not match Claude's pentesting performance. Requires significant GPU resources (24GB+ VRAM for 70B models).
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Model Selection Guide
+
+### By Use Case
+
+| Use Case | Recommended Model | Rationale |
+|----------|-------------------|----------|
+| General pentesting | `claude-sonnet-4-5` | Best balance of quality and cost |
+| Complex exploitation | `claude-opus-4` | Maximum reasoning for multi-step chains |
+| Budget testing | `claude-sonnet-3-5` | Good quality at lower cost |
+| Enterprise AWS | `anthropic.claude-sonnet-4-5` (Bedrock) | AWS compliance and security |
+| Offline/air-gapped | `meta-llama/Llama-3.1-70B-Instruct` (vLLM) | No external API calls |
+| Whitebox code analysis | `deepseek-ai/deepseek-coder-33b-instruct` (vLLM) | Code-specialized model |
+
+### By Performance Requirements
+
+<CardGroup cols={3}>
+  <Card title="Best Quality" icon="trophy">
+    **claude-opus-4**
+
+    Maximum reasoning capability. Use for complex targets or when quality is critical.
+  </Card>
+
+  <Card title="Best Balance" icon="scale-balanced">
+    **claude-sonnet-4-5**
+
+    Excellent quality with reasonable cost and speed. Recommended default.
+  </Card>
+
+  <Card title="Best Cost" icon="dollar-sign">
+    **claude-sonnet-3-5**
+
+    Lower cost while maintaining good quality. Suitable for large-scale testing.
+  </Card>
+</CardGroup>
+
+## Model Capabilities
+
+All recommended models support:
+
+- **Tool Use**: Execute pentest tools (curl, nmap, etc.)
+- **Long Context**: Handle large attack surface reports (100k+ tokens)
+- **Structured Output**: Generate JSON findings and reports
+- **Multi-turn Reasoning**: Adapt based on target responses
+
+<Note>
+Pensar Apex automatically handles tool calling and structured output for all supported models.
+</Note>
+
+## Context Windows
+
+Different models have different context limits:
+
+| Model | Context Window | Suitable For |
+|-------|----------------|-------------|
+| Claude 4.5 Sonnet | 200k tokens | Large applications, extensive attack surfaces |
+| Claude 4 Opus | 200k tokens | Complex multi-step exploitation |
+| GPT-4 | 128k tokens | Medium-sized applications |
+| Llama 3.1 70B | 128k tokens | Standard pentesting scenarios |
+
+<Tip>
+Larger context windows allow testing more endpoints in a single session without summarization.
+</Tip>
+
+## Cost Considerations
+
+Model costs vary significantly:
+
+### Anthropic Pricing (approximate)
+
+- **Claude 4.5 Sonnet**: ~$3 per 1M input tokens, ~$15 per 1M output tokens
+- **Claude 4 Opus**: ~$15 per 1M input tokens, ~$75 per 1M output tokens
+- **Claude 3.5 Sonnet**: ~$3 per 1M input tokens, ~$15 per 1M output tokens
+
+### Typical Pentest Costs
+
+- **Simple target (5-10 endpoints)**: $0.50 - $2.00
+- **Medium target (20-50 endpoints)**: $2.00 - $10.00
+- **Large target (100+ endpoints)**: $10.00 - $50.00
+
+<Note>
+Actual costs depend on target complexity, number of endpoints, and exploitation depth.
+</Note>
+
+## Custom Models
+
+You can use any model compatible with your provider:
+
+### OpenRouter Custom Models
+
+Any model on [openrouter.ai/models](https://openrouter.ai/models):
+
+```bash
+pensar pentest --target https://example.com --model mistralai/mixtral-8x22b
+```
+
+### vLLM Custom Models
+
+Any model supported by vLLM:
+
+```bash
+# Start vLLM with your model
+vllm serve WizardLM/WizardCoder-Python-34B-V1.0 --port 8000
+
+# Use in Pensar Apex
+export LOCAL_MODEL_URL="http://localhost:8000/v1"
+pensar pentest --target https://example.com --model WizardLM/WizardCoder-Python-34B-V1.0
+```
+
+<Warning>
+Custom models may not perform well for pentesting. Test thoroughly before production use.
+</Warning>
+
+## Model Configuration Storage
+
+Your selected model is saved in `~/.pensar/config.json`:
+
+```json
+{
+  "selectedModelId": "claude-sonnet-4-5",
+  "localModelName": null,
+  "localModelUrl": null
+}
+```
+
+Command-line `--model` flag always overrides this setting.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Model not available">
+    Ensure the model is supported by your provider:
+
+    ```bash
+    # Check provider configuration
+    pensar doctor
+    ```
+
+    Verify API key for the correct provider is set.
+  </Accordion>
+
+  <Accordion title="Poor pentesting results">
+    Try upgrading to a more capable model:
+
+    - Switch from GPT-4 to Claude: `--model claude-sonnet-4-5`
+    - Switch from Sonnet to Opus: `--model claude-opus-4`
+
+    Claude models generally perform better for security testing.
+  </Accordion>
+
+  <Accordion title="Context length exceeded">
+    Use a model with larger context window:
+
+    - Claude models: 200k tokens
+    - GPT-4: 128k tokens
+
+    Or reduce target scope to test fewer endpoints per run.
+  </Accordion>
+
+  <Accordion title="Local model too slow">
+    For vLLM:
+
+    - Use GPU acceleration
+    - Enable quantization (8-bit, 4-bit)
+    - Use smaller models (7B or 13B instead of 70B)
+
+    See [vLLM Setup Guide](/guides/vllm-setup) for optimization tips.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Providers" icon="robot" href="/configuration/ai-providers">
+    Configure your AI provider API keys
+  </Card>
+  <Card title="Environment Variables" icon="terminal" href="/configuration/environment-variables">
+    Complete configuration reference
+  </Card>
+  <Card title="vLLM Setup" icon="server" href="/guides/vllm-setup">
+    Run models locally with vLLM
+  </Card>
+  <Card title="Run Pentest" icon="shield" href="/commands/pentest">
+    Start testing with your selected model
+  </Card>
+</CardGroup>

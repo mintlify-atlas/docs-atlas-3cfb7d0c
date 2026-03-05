@@ -1,0 +1,555 @@
+---
+title: Attack Surface Discovery
+description: Learn how Pensar Apex maps your application's attack surface in blackbox and whitebox modes
+---
+
+## Overview
+
+**Attack surface discovery** is the reconnaissance phase where Pensar Apex identifies all entry points, endpoints, services, and authentication flows in your application. This phase is critical because it determines what gets tested in subsequent penetration testing phases.
+
+Pensar Apex supports two discovery modes:
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Mode" icon="mask">
+    Probes a live target from the outside with no source code access. Mimics how an external attacker would discover your application.
+  </Card>
+  
+  <Card title="Whitebox Mode" icon="code">
+    Analyzes source code directly to extract routes, endpoints, and authentication flows. Provides complete coverage of your API surface.
+  </Card>
+</CardGroup>
+
+## Blackbox Attack Surface Discovery
+
+In blackbox mode, the agent treats your application as a completely opaque system and discovers its attack surface through external observation.
+
+### Discovery Phases
+
+The blackbox attack surface agent follows a systematic methodology:
+
+<Steps>
+  <Step title="Authentication (if credentials provided)">
+    If you provide credentials, the agent authenticates first to discover protected endpoints and authenticated functionality.
+    
+    ```typescript
+    const session = await sessions.create({
+      name: "Blackbox Test",
+      targets: ["https://example.com"],
+      config: {
+        authCredentials: {
+          username: "testuser",
+          password: "testpass",
+          loginUrl: "https://example.com/login",
+        },
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Subdomain Enumeration (optional)">
+    When enabled, the agent discovers subdomains using:
+    - DNS brute-forcing with wordlists
+    - Certificate Transparency logs
+    - DNS zone transfers (if misconfigured)
+    
+    ```typescript
+    config: {
+      enumerateSubdomains: true,
+    }
+    ```
+  </Step>
+
+  <Step title="Service Discovery">
+    The agent probes for running services using:
+    - Port scanning (nmap)
+    - HTTP/HTTPS probing
+    - Service fingerprinting
+    - Technology detection
+  </Step>
+
+  <Step title="Web Crawling">
+    For web applications, the agent:
+    - Crawls HTML pages and follows links
+    - Executes JavaScript to discover SPA routes
+    - Extracts API endpoints from JavaScript bundles
+    - Maps authentication and form flows
+  </Step>
+
+  <Step title="API Endpoint Discovery">
+    The agent discovers API endpoints through:
+    - JavaScript source analysis
+    - Common path enumeration
+    - OpenAPI/Swagger discovery
+    - GraphQL introspection
+  </Step>
+
+  <Step title="Asset Documentation">
+    All discoveries are documented using the `document_asset` tool:
+    - Domains and subdomains
+    - Open ports and services
+    - Web pages and routes
+    - API endpoints
+    - Authentication mechanisms
+  </Step>
+</Steps>
+
+### Blackbox Agent Configuration
+
+```typescript
+import { BlackboxAttackSurfaceAgent } from "@/core/agents/specialized/attackSurface";
+import { sessions } from "@/core/session";
+
+const session = await sessions.create({
+  name: "Attack Surface Analysis",
+  targets: ["https://example.com"],
+  config: {
+    // Optional: Provide credentials for authenticated discovery
+    authCredentials: {
+      username: "testuser",
+      password: "testpass",
+      loginUrl: "https://example.com/login",
+    },
+    // Optional: Enable subdomain enumeration
+    enumerateSubdomains: true,
+    // Optional: Restrict scope to specific hosts
+    scopeConstraints: {
+      strictScope: true,
+      allowedHosts: ["example.com", "*.example.com"],
+    },
+  },
+});
+
+const agent = new BlackboxAttackSurfaceAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+const result = await agent.consume({
+  onTextDelta: (d) => process.stdout.write(d.text),
+  onToolCall: (d) => console.log(`→ ${d.toolName}`),
+});
+
+console.log(`Discovered ${result.results?.discoveredAssets.length} assets`);
+console.log(`Identified ${result.targets.length} high-priority targets`);
+```
+
+### Blackbox Discovery Tools
+
+The blackbox agent uses these tools:
+
+<AccordionGroup>
+  <Accordion title="execute_command" icon="terminal">
+    Runs reconnaissance commands:
+    - `nmap` for port scanning
+    - `dig` for DNS queries
+    - `curl` for HTTP probing
+    - `subfinder` for subdomain enumeration
+  </Accordion>
+
+  <Accordion title="browser_navigate" icon="browser">
+    Loads web pages in a headless browser to:
+    - Execute JavaScript and discover SPA routes
+    - Capture rendered content
+    - Follow navigation flows
+  </Accordion>
+
+  <Accordion title="browser_snapshot" icon="camera">
+    Captures the DOM to:
+    - Extract links and forms
+    - Identify authentication mechanisms
+    - Map page structure
+  </Accordion>
+
+  <Accordion title="document_asset" icon="file-plus">
+    Records discovered assets:
+    ```typescript
+    {
+      tool: "document_asset",
+      args: {
+        assetType: "api-endpoint",
+        identifier: "https://api.example.com/v1/users",
+        description: "User management API endpoint",
+        details: {
+          method: "GET",
+          requiresAuth: true,
+          technology: "REST",
+        },
+      },
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="create_attack_surface_report" icon="flag-checkered">
+    Generates the final report when discovery is complete. This tool triggers the stop condition.
+  </Accordion>
+</AccordionGroup>
+
+## Whitebox Attack Surface Discovery
+
+In whitebox mode, the agent analyzes your application's source code to extract the complete attack surface with 100% accuracy.
+
+### How It Works
+
+```typescript
+import { runAttackSurfaceAgent } from "@/core/api/attackSurface";
+
+const result = await runAttackSurfaceAgent({
+  target: "https://example.com",
+  cwd: "/path/to/source",  // Presence of cwd enables whitebox mode
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+```
+
+When `cwd` is provided, Pensar Apex:
+
+1. **Detects the framework** (Express, FastAPI, Rails, Django, etc.)
+2. **Extracts routes** from framework-specific routing files
+3. **Maps endpoints** to their HTTP methods and parameters
+4. **Identifies authentication** requirements and middleware
+5. **Cross-references** with the live target to verify accessibility
+
+### Supported Frameworks
+
+<CardGroup cols={3}>
+  <Card title="Express.js" icon="node">
+    - Route definitions
+    - Middleware chains
+    - REST and GraphQL
+  </Card>
+  
+  <Card title="FastAPI" icon="python">
+    - Path operations
+    - Pydantic schemas
+    - OAuth2 flows
+  </Card>
+  
+  <Card title="Django" icon="python">
+    - URL patterns
+    - Class-based views
+    - Django REST Framework
+  </Card>
+  
+  <Card title="Ruby on Rails" icon="gem">
+    - routes.rb definitions
+    - Controller actions
+    - API mode endpoints
+  </Card>
+  
+  <Card title="Spring Boot" icon="java">
+    - @RequestMapping
+    - @RestController
+    - Spring Security
+  </Card>
+  
+  <Card title="Next.js" icon="react">
+    - App Router routes
+    - API routes
+    - Server Actions
+  </Card>
+</CardGroup>
+
+### Whitebox Output Example
+
+```json
+{
+  "summary": {
+    "totalApps": 1,
+    "totalApiEndpoints": 42,
+    "totalPages": 15,
+    "analysisComplete": true
+  },
+  "applications": [
+    {
+      "name": "Main API",
+      "framework": "Express.js",
+      "endpoints": [
+        {
+          "path": "/api/users",
+          "method": "GET",
+          "authentication": "JWT",
+          "parameters": ["page", "limit"],
+          "sourceLocation": "src/routes/users.js:12"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Attack Surface Output
+
+Both modes produce an `AttackSurfaceResult`:
+
+```typescript
+export interface AttackSurfaceResult {
+  /** The full analysis results */
+  results: AttackSurfaceAnalysisResults | null;
+  
+  /** High-priority targets for penetration testing */
+  targets: PentestTarget[];
+  
+  /** Path to the attack-surface-results.json file */
+  resultsPath: string;
+  
+  /** Path to the session's assets directory */
+  assetsPath: string;
+}
+
+export interface AttackSurfaceAnalysisResults {
+  summary: AttackSurfaceSummary;
+  discoveredAssets: string[];
+  targets: PentestTarget[];
+  keyFindings: string[];
+}
+
+export interface PentestTarget {
+  /** The target URL or endpoint */
+  target: string;
+  
+  /** Testing objective (e.g., "Test for SQL injection") */
+  objective: string;
+  
+  /** Why this target is high-priority */
+  rationale: string;
+  
+  /** Authentication info (if available) */
+  authenticationInfo?: {
+    method: string;
+    details: string;
+    cookies?: string;
+    headers?: string;
+  };
+}
+```
+
+### What Gets Mapped
+
+<Tabs>
+  <Tab title="Endpoints">
+    - REST API endpoints
+    - GraphQL endpoints
+    - WebSocket connections
+    - gRPC services
+    - HTTP methods (GET, POST, PUT, DELETE, etc.)
+    - Query parameters and request bodies
+  </Tab>
+  
+  <Tab title="Pages">
+    - Public pages
+    - Authenticated pages
+    - Admin panels
+    - SPA routes
+    - Form submissions
+    - File uploads
+  </Tab>
+  
+  <Tab title="Authentication">
+    - Login endpoints
+    - Registration flows
+    - Password reset
+    - OAuth/SAML providers
+    - API key mechanisms
+    - Session management
+  </Tab>
+  
+  <Tab title="Infrastructure">
+    - Subdomains
+    - Open ports
+    - Running services
+    - Technology stack
+    - CDN configuration
+    - SSL/TLS setup
+  </Tab>
+</Tabs>
+
+## Scope Control
+
+Control what the agent discovers with scope constraints:
+
+```typescript
+config: {
+  scopeConstraints: {
+    // Strict mode: only test URLs within allowed hosts
+    strictScope: true,
+    
+    // Allowed hosts (supports wildcards)
+    allowedHosts: [
+      "example.com",
+      "*.example.com",
+      "api.partner.com",
+    ],
+    
+    // Allowed ports
+    allowedPorts: [80, 443, 8080],
+    
+    // Excluded paths
+    excludedPaths: [
+      "/admin/delete",
+      "/api/payments/charge",
+    ],
+  },
+}
+```
+
+<Warning>
+  **Strict scope mode** prevents the agent from scanning outside allowed hosts. This is essential for bug bounty programs and production testing where scope violations can have serious consequences.
+</Warning>
+
+## Authentication During Discovery
+
+If you provide credentials, the agent will authenticate before discovering the attack surface:
+
+```typescript
+config: {
+  authCredentials: {
+    username: "testuser",
+    password: "testpass",
+    loginUrl: "https://example.com/login",
+    
+    // Optional: Additional credential fields
+    credentialType: "username-password",
+    additionalFields: {
+      apiKey: "your-api-key",
+      mfaToken: "123456",
+    },
+  },
+  
+  // Optional: Custom authentication instructions
+  authenticationInstructions: `
+    1. Navigate to the login page
+    2. Fill in the username and password
+    3. Click the "Sign In" button
+    4. Wait for the dashboard to load
+  `,
+}
+```
+
+The agent will:
+1. Authenticate using the provided credentials
+2. Export the authenticated session (cookies, tokens)
+3. Use the session for all subsequent discovery
+4. Include authentication info with high-priority targets
+
+## Prioritization
+
+The agent automatically prioritizes targets based on:
+
+- **Risk factors:** Admin panels, API endpoints, file uploads, authentication flows
+- **Technology indicators:** Outdated frameworks, known vulnerable libraries
+- **Complexity:** Endpoints with many parameters, complex authentication
+- **Exposure:** Publicly accessible vs. authenticated-only
+
+```typescript
+// Example prioritized target
+{
+  target: "https://example.com/api/admin/users",
+  objective: "Test for authorization bypass and privilege escalation",
+  rationale: "Admin endpoint accessible after authentication. May be vulnerable to IDOR or missing authorization checks.",
+  authenticationInfo: {
+    method: "Cookie-based",
+    details: "Session cookie from login flow",
+    cookies: "sessionId=abc123; userId=42",
+  },
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Mode">
+    - Use **blackbox** for external security assessments and bug bounties
+    - Use **whitebox** for internal testing and pre-deployment validation
+    - Consider running both modes to compare coverage
+  </Accordion>
+
+  <Accordion title="Provide Authentication">
+    - Always provide credentials if the application has authentication
+    - Authenticated discovery finds 3-5x more endpoints than unauthenticated
+    - Include all user roles to discover role-specific endpoints
+  </Accordion>
+
+  <Accordion title="Control Scope Carefully">
+    - Enable `strictScope` for production environments
+    - Test scope configuration with a dry run first
+    - Document excluded paths and rationale
+  </Accordion>
+
+  <Accordion title="Review Discovery Results">
+    - Manually inspect the attack surface report
+    - Verify that critical endpoints are discovered
+    - Check for false positives in asset list
+    - Adjust scope and re-run if needed
+  </Accordion>
+</AccordionGroup>
+
+## Example: Complete Discovery Flow
+
+```typescript
+import { sessions } from "@/core/session";
+import { runAttackSurfaceAgent } from "@/core/api/attackSurface";
+
+// Create session with authentication
+const session = await sessions.create({
+  name: "E-commerce Attack Surface",
+  targets: ["https://shop.example.com"],
+  config: {
+    authCredentials: {
+      username: "testuser@example.com",
+      password: "SecurePass123!",
+      loginUrl: "https://shop.example.com/login",
+    },
+    scopeConstraints: {
+      strictScope: true,
+      allowedHosts: ["shop.example.com", "api.shop.example.com"],
+    },
+    enumerateSubdomains: true,
+  },
+});
+
+// Run discovery
+const result = await runAttackSurfaceAgent({
+  target: "https://shop.example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text),
+  },
+});
+
+// Review results
+console.log(`\n=== Attack Surface Analysis ===");
+console.log(`Total assets: ${result.results?.summary.totalAssets}`);
+console.log(`High-priority targets: ${result.targets.length}\n`);
+
+for (const target of result.targets) {
+  console.log(`Target: ${target.target}`);
+  console.log(`Objective: ${target.objective}`);
+  console.log(`Rationale: ${target.rationale}\n`);
+}
+
+// Save for later testing
+console.log(`Results saved to: ${result.resultsPath}`);
+console.log(`Assets saved to: ${result.assetsPath}`);
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Agent Architecture" icon="sitemap" href="/concepts/agents">
+    Learn about the agent system that powers attack surface discovery
+  </Card>
+  
+  <Card title="Penetration Testing" icon="shield-virus" href="/guides/penetration-testing">
+    Use discovered targets for vulnerability testing
+  </Card>
+  
+  <Card title="Session Management" icon="folder" href="/concepts/sessions">
+    Understand how sessions store discovery results
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/attack-surface">
+    Complete API documentation for attack surface agents
+  </Card>
+</CardGroup>

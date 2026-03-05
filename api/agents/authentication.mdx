@@ -1,0 +1,547 @@
+---
+title: "AuthenticationAgent"
+description: "Specialized agent for automated authentication and session management"
+---
+
+## Overview
+
+The `AuthenticationAgent` is an authentication-focused specialization of the `OffensiveSecurityAgent` that handles automated authentication flows. It detects authentication schemes, logs in with provided credentials, manages sessions, and exports authentication state for other agents.
+
+Credentials are managed automatically via the session's `CredentialManager` — the agent never sees raw secrets. The credential manager is provisioned automatically when you create a session with `authCredentials`.
+
+## Key Features
+
+- **Automatic Scheme Detection**: Detects form-based, JSON, Basic Auth, Bearer, OAuth, and API key authentication
+- **Credential Security**: Uses CredentialManager to resolve credentials without exposing secrets to the model
+- **Browser Automation**: Handles SPAs, OAuth flows, CAPTCHA, and MFA with browser tools
+- **Session Export**: Exports cookies and headers for use by other agents
+- **Email Integration**: Supports email-based verification flows (OTP, magic links)
+- **Flow Documentation**: Documents auth flows for future runs
+
+## Constructor
+
+```typescript
+new AuthenticationAgent(opts: AuthenticationAgentInput)
+```
+
+<ParamField path="opts" type="AuthenticationAgentInput" required>
+  Configuration object for the authentication agent
+</ParamField>
+
+### AuthenticationAgentInput
+
+<ParamField path="target" type="string" required>
+  The target requiring authentication (URL or domain)
+</ParamField>
+
+<ParamField path="model" type="AIModel" required>
+  AI model identifier (e.g., `"claude-sonnet-4-20250514"`)
+</ParamField>
+
+<ParamField path="session" type="SessionInfo" required>
+  Session that provides paths and, when created with `authCredentials`, an auto-provisioned CredentialManager
+</ParamField>
+
+<ParamField path="authHints" type="AuthHints">
+  Hints about the auth flow from reconnaissance
+  
+  <ParamField path="authScheme" type="string">
+    Detected authentication scheme (e.g., "form", "bearer", "oauth")
+  </ParamField>
+  
+  <ParamField path="csrfRequired" type="boolean">
+    Whether CSRF protection was detected
+  </ParamField>
+  
+  <ParamField path="browserRequired" type="boolean">
+    Whether browser automation may be needed
+  </ParamField>
+  
+  <ParamField path="protectedEndpoints" type="string[]">
+    List of endpoints that require authentication (for verification)
+  </ParamField>
+</ParamField>
+
+<ParamField path="authConfig" type="AIAuthConfig">
+  Optional per-provider API key overrides
+</ParamField>
+
+<ParamField path="onStepFinish" type="StreamTextOnStepFinishCallback<ToolSet>">
+  Optional callback after each agent step
+</ParamField>
+
+<ParamField path="abortSignal" type="AbortSignal">
+  AbortSignal to cancel mid-run
+</ParamField>
+
+<ParamField path="callbacks" type="ConsumeCallbacks">
+  Optional persistence callbacks for external storage integration
+</ParamField>
+
+## Result Type
+
+The `consume()` method returns an `AuthenticationResult`:
+
+<ResponseField name="success" type="boolean">
+  Whether authentication was successful
+</ResponseField>
+
+<ResponseField name="summary" type="string">
+  Summary of the authentication process
+</ResponseField>
+
+<ResponseField name="exportedCookies" type="string">
+  Exported cookies from the authentication process (e.g., "session_id=abc123; token=xyz789")
+</ResponseField>
+
+<ResponseField name="exportedHeaders" type="Record<string, string>">
+  Exported headers from the authentication process (e.g., Authorization, X-API-Key)
+</ResponseField>
+
+<ResponseField name="strategy" type="string">
+  Strategy used for authentication (e.g., "form_post", "bearer_token", "oauth")
+</ResponseField>
+
+<ResponseField name="authBarrier" type="AuthBarrier | undefined">
+  Authentication barrier encountered, if any
+  
+  <ParamField path="type" type="'captcha' | 'mfa' | 'oauth_consent' | 'rate_limit' | 'invite_code' | 'admin_approval' | 'email_verification' | 'phone_verification' | 'unknown'">
+    Type of barrier encountered
+  </ParamField>
+  
+  <ParamField path="details" type="string">
+    Details about the barrier
+  </ParamField>
+  
+  <ParamField path="loginUrl" type="string">
+    Login URL where the barrier was encountered
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="authDataPath" type="string">
+  Path to the persisted auth data file (inside session auth/ directory)
+</ResponseField>
+
+## Active Tools
+
+The AuthenticationAgent uses the following tools:
+
+- `execute_command` - Run authentication-related commands
+- `authenticate_session` - Attempt authentication with credentials
+- `complete_authentication` - Mark authentication complete and export session data
+- `browser_navigate` - Navigate to login pages
+- `browser_snapshot` - Inspect login forms and page structure
+- `browser_screenshot` - Capture screenshots for documentation
+- `browser_click` - Click login buttons and links
+- `browser_fill` - Fill username/password fields (with secure credential resolution)
+- `browser_evaluate` - Execute JavaScript for SPA interactions
+- `browser_console` - Access browser console for debugging
+- `browser_get_cookies` - Extract cookies after successful login
+- `email_list_inboxes` - List available email inboxes (if configured)
+- `email_list_messages` - List messages for verification codes
+- `email_search_messages` - Search for specific verification emails
+- `email_get_message` - Retrieve verification codes or magic links
+
+## Usage Examples
+
+### Basic Authentication
+
+```typescript
+import { AuthenticationAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+
+const session = await createSession({
+  name: "Auth Test",
+  targets: ["https://example.com"],
+  config: {
+    authCredentials: {
+      username: "admin@example.com",
+      password: "secure_password",
+      loginUrl: "https://example.com/login",
+    },
+  },
+});
+
+const agent = new AuthenticationAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session, // credential manager is auto-provisioned
+});
+
+const { success, summary, exportedCookies, exportedHeaders } = await agent.consume({
+  onTextDelta: (delta) => {
+    process.stdout.write(delta.text);
+  },
+});
+
+if (success) {
+  console.log(`\n✓ Authentication succeeded: ${summary}`);
+  console.log(`Cookies: ${exportedCookies}`);
+  console.log(`Headers: ${JSON.stringify(exportedHeaders, null, 2)}`);
+} else {
+  console.log(`\n✗ Authentication failed: ${summary}`);
+}
+```
+
+### With Authentication Hints
+
+```typescript
+import { AuthenticationAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+
+const session = await createSession({
+  name: "Hinted Auth",
+  targets: ["https://api.example.com"],
+  config: {
+    authCredentials: {
+      username: "user@example.com",
+      password: "password123",
+      loginUrl: "https://api.example.com/auth/login",
+    },
+  },
+});
+
+const agent = new AuthenticationAgent({
+  target: "https://api.example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  authHints: {
+    authScheme: "bearer",
+    csrfRequired: true,
+    browserRequired: false,
+    protectedEndpoints: [
+      "https://api.example.com/api/user",
+      "https://api.example.com/api/admin",
+    ],
+  },
+});
+
+const result = await agent.consume({
+  onTextDelta: (delta) => process.stdout.write(delta.text),
+});
+```
+
+### Multiple Credentials (Role-Based)
+
+```typescript
+import { AuthenticationAgent } from "@pensar/apex";
+import { CredentialManager } from "@pensar/apex/credentials";
+import { createSession } from "@pensar/apex/session";
+
+const credentialManager = new CredentialManager();
+
+// Add multiple credentials with different roles
+credentialManager.addCredential({
+  id: "admin_creds",
+  username: "admin@example.com",
+  password: "admin_password",
+  loginUrl: "https://example.com/login",
+  role: "admin",
+});
+
+credentialManager.addCredential({
+  id: "user_creds",
+  username: "user@example.com",
+  password: "user_password",
+  loginUrl: "https://example.com/login",
+  role: "user",
+});
+
+const session = await createSession({
+  name: "Multi-Role Auth",
+  targets: ["https://example.com"],
+  credentialManager,
+});
+
+// Authenticate as admin
+const adminAgent = new AuthenticationAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+const adminResult = await adminAgent.consume();
+if (adminResult.success) {
+  console.log(`Admin authenticated: ${adminResult.strategy}`);
+}
+```
+
+### Token Verification (No Login Flow)
+
+```typescript
+import { AuthenticationAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+
+const session = await createSession({
+  name: "Token Verification",
+  targets: ["https://api.example.com"],
+  config: {
+    authCredentials: {
+      // Provide existing tokens for verification
+      tokens: {
+        bearerToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        customHeaders: {
+          "X-API-Key": "secret_key_123",
+        },
+      },
+    },
+  },
+});
+
+const agent = new AuthenticationAgent({
+  target: "https://api.example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  authHints: {
+    protectedEndpoints: ["https://api.example.com/api/user"],
+  },
+});
+
+const result = await agent.consume();
+
+if (result.success) {
+  console.log("Tokens are valid and grant access");
+} else {
+  console.log("Tokens are invalid or expired");
+}
+```
+
+### With Email Integration (MFA/OTP)
+
+```typescript
+import { AuthenticationAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+
+const session = await createSession({
+  name: "MFA Auth",
+  targets: ["https://example.com"],
+  config: {
+    authCredentials: {
+      username: "user@example.com",
+      password: "password123",
+      loginUrl: "https://example.com/login",
+    },
+    emailIntegration: {
+      provider: "imap",
+      inboxes: [
+        {
+          email: "user@example.com",
+          imapHost: "imap.gmail.com",
+          imapPort: 993,
+          username: "user@example.com",
+          password: "email_app_password",
+        },
+      ],
+    },
+  },
+});
+
+const agent = new AuthenticationAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+  authHints: {
+    authScheme: "form",
+    browserRequired: true,
+  },
+});
+
+const result = await agent.consume({
+  onTextDelta: (delta) => process.stdout.write(delta.text),
+});
+
+// Agent will automatically:
+// 1. Fill login form
+// 2. Wait for MFA prompt
+// 3. Check email inbox for OTP code
+// 4. Enter OTP code
+// 5. Complete authentication
+```
+
+### Using Exported Auth in Other Agents
+
+```typescript
+import { AuthenticationAgent, TargetedPentestAgent } from "@pensar/apex";
+import { createSession } from "@pensar/apex/session";
+import { writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
+
+const session = await createSession({
+  name: "Full Test",
+  targets: ["https://example.com"],
+  config: {
+    authCredentials: {
+      username: "admin",
+      password: "password",
+      loginUrl: "https://example.com/login",
+    },
+  },
+});
+
+// Step 1: Authenticate
+const authAgent = new AuthenticationAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+const authResult = await authAgent.consume();
+
+if (!authResult.success) {
+  throw new Error(`Authentication failed: ${authResult.summary}`);
+}
+
+console.log(`✓ Authenticated with ${authResult.strategy}`);
+
+// Step 2: Auth data is automatically persisted to session auth/auth-data.json
+// Step 3: Use authenticated session in pentest agent
+const pentestAgent = new TargetedPentestAgent({
+  target: "https://example.com",
+  objectives: ["Test for IDOR on /api/users/{id}"],
+  model: "claude-sonnet-4-20250514",
+  session, // Automatically uses auth-data.json
+});
+
+const pentestResult = await pentestAgent.consume();
+console.log(`Found ${pentestResult.findings.length} vulnerabilities`);
+```
+
+## Authentication Strategies
+
+The agent supports multiple authentication strategies:
+
+<Tabs>
+  <Tab title="Form-Based Auth">
+    Traditional HTML form login:
+    ```typescript
+    authCredentials: {
+      username: "admin",
+      password: "password",
+      loginUrl: "https://example.com/login",
+    }
+    ```
+  </Tab>
+  
+  <Tab title="JSON API Auth">
+    JSON-based authentication:
+    ```typescript
+    authCredentials: {
+      username: "admin@example.com",
+      password: "password",
+      loginUrl: "https://api.example.com/auth/login",
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Bearer Token">
+    Token verification and usage:
+    ```typescript
+    authCredentials: {
+      tokens: {
+        bearerToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      },
+    }
+    ```
+  </Tab>
+  
+  <Tab title="API Key">
+    API key authentication:
+    ```typescript
+    authCredentials: {
+      tokens: {
+        customHeaders: {
+          "X-API-Key": "secret_key_123",
+        },
+      },
+    }
+    ```
+  </Tab>
+  
+  <Tab title="OAuth">
+    OAuth flows (requires browser):
+    ```typescript
+    authCredentials: {
+      username: "user@example.com",
+      password: "password",
+      loginUrl: "https://example.com/oauth/authorize",
+    },
+    authHints: {
+      authScheme: "oauth",
+      browserRequired: true,
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Authentication Barriers
+
+The agent detects and reports various authentication barriers:
+
+- **CAPTCHA**: Visual or reCAPTCHA challenges
+- **MFA**: Multi-factor authentication (email OTP, SMS, authenticator apps)
+- **OAuth Consent**: Third-party OAuth consent screens
+- **Rate Limiting**: Login attempt restrictions
+- **Invite Code**: Registration requires invitation
+- **Admin Approval**: Account requires manual approval
+- **Email Verification**: Email verification required before login
+- **Phone Verification**: Phone number verification required
+
+Barriers are returned in the `authBarrier` field of the result.
+
+## Persisted Auth Data
+
+Authentication state is persisted to `{session.rootPath}/auth/auth-data.json`:
+
+```json
+{
+  "authenticated": true,
+  "cookies": "session_id=abc123; token=xyz789",
+  "headers": {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "X-API-Key": "secret_key_123"
+  },
+  "strategy": "bearer_token",
+  "authBarrier": null,
+  "summary": "Successfully authenticated using bearer token"
+}
+```
+
+Other agents (like TargetedPentestAgent) automatically read this file and include the credentials in their requests.
+
+## Convenience Runner
+
+```typescript
+import { runAuthenticationAgent } from "@pensar/apex/agents/specialized/authenticationAgent";
+
+const result = await runAuthenticationAgent({
+  target: "https://example.com",
+  model: "claude-sonnet-4-20250514",
+  session,
+});
+
+// Automatically logs progress and results to console
+```
+
+## Best Practices
+
+<Warning>
+  **Credential Security**: Never pass raw passwords to browser tools. Use `credentialId` + `credentialField` parameters for secure credential resolution.
+</Warning>
+
+<Note>
+  **Auto-Provisioning**: The CredentialManager is automatically provisioned when you create a session with `authCredentials`. No need to create it manually.
+</Note>
+
+<Tip>
+  **Email Integration**: For targets with email-based MFA or magic links, configure `emailIntegration` in the session config.
+</Tip>
+
+<Warning>
+  **Browser Requirement**: Some authentication flows (OAuth, CAPTCHA, SPAs) require browser automation. Set `authHints.browserRequired: true` to prioritize browser tools.
+</Warning>
+
+## Related
+
+- [OffensiveSecurityAgent](/api/agents/offensive-security)
+- [BlackboxAttackSurfaceAgent](/api/agents/attack-surface)
+- [TargetedPentestAgent](/api/agents/pentest)

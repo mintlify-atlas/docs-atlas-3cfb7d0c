@@ -1,97 +1,282 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Pensar Apex Documentation"
+description: "AI-powered penetration testing CLI with autonomous agents for comprehensive security testing"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#1a1d27] via-[#242838] to-[#0f1117] py-20 dark:bg-gradient-to-br dark:from-[#1a1d27] dark:via-[#242838] dark:to-[#0f1117]">
+  <div className="max-w-6xl mx-auto px-6">
+    <div className="grid lg:grid-cols-12 gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6">
+          AI-Powered Penetration Testing
+        </h1>
+        <p className="text-xl text-gray-300 mb-8 max-w-2xl">
+          Autonomous security testing agents that perform comprehensive blackbox and whitebox pentesting directly in your terminal.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/quickstart" 
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-[#cb0404] hover:bg-[#a00303] text-white font-semibold transition-colors no-underline"
+          >
+            Get Started
+            <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
+          <a 
+            href="/api/overview" 
+            className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors no-underline"
+          >
+            API Reference
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-[#cb0404]/20 to-[#e37b84]/20 blur-3xl rounded-full"></div>
+          <div className="relative bg-[#1a1d27] border border-[#27272a] rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-[#cb0404]"></div>
+              <div className="w-3 h-3 rounded-full bg-[#e37b84]"></div>
+              <div className="w-3 h-3 rounded-full bg-[#f3d2d2]"></div>
+            </div>
+            <pre className="text-sm text-gray-300">
+              <code>{`$ pensar pentest --target example.com
 
-Get your documentation site up and running in minutes.
+=================================================
+PENTEST ORCHESTRATION
+=================================================
+Target:  example.com
+Model:   claude-sonnet-4-5
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+→ Discovering attack surface...
+→ Analyzing authentication...
+→ Testing vulnerabilities...
 
-## Make it yours
+Found 3 vulnerabilities
+Findings: ~/.pensar/sessions/123/findings/
+POCs: ~/.pensar/sessions/123/pocs/`}</code>
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Design a docs site that looks great and empowers your users.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Quick Start</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Get up and running with Pensar Apex in minutes</p>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
+  <Steps>
+    <Step title="Install Pensar Apex">
+      Install via your preferred package manager or installation script:
+
+      <CodeGroup>
+      ```bash npm
+      npm install -g @pensar/apex
+      ```
+
+      ```bash Homebrew
+      brew tap pensarai/tap
+      brew install apex
+      ```
+
+      ```bash Quick Install (macOS/Linux)
+      curl -fsSL https://pensarai.com/install.sh | bash
+      ```
+      </CodeGroup>
+    </Step>
+
+    <Step title="Configure AI Provider">
+      Set your AI provider API key as an environment variable:
+
+      ```bash
+      export ANTHROPIC_API_KEY="your-api-key-here"
+      ```
+
+      Pensar Apex supports Anthropic, OpenAI, AWS Bedrock, and vLLM. Anthropic models provide the best performance.
+    </Step>
+
+    <Step title="Run Your First Pentest">
+      Launch the TUI or run a pentest from the command line:
+
+      ```bash
+      # Launch interactive TUI
+      pensar
+
+      # Run blackbox pentest
+      pensar pentest --target https://example.com
+
+      # Run whitebox pentest with source code
+      pensar pentest --target https://example.com --cwd /path/to/code
+      ```
+
+      <Accordion title="Example Output">
+      ```
+      =================================================
+      RESULTS
+      =================================================
+      Findings:  3
+      Path:      ~/.pensar/sessions/abc123/findings/
+      POCs:      ~/.pensar/sessions/abc123/pocs/
+      Report:    ~/.pensar/sessions/abc123/report.md
+      ```
+      </Accordion>
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Explore by Topic</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Learn about the core features and concepts</p>
+
+  <CardGroup cols={3}>
     <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      title="Core Concepts"
+      icon="brain"
+      href="/concepts/agents"
+    >
+      Understand autonomous agents, attack surface discovery, and vulnerability findings
+    </Card>
+    <Card
+      title="Command Reference"
+      icon="terminal"
+      href="/commands/overview"
+    >
+      Complete reference for all CLI commands and flags
+    </Card>
+    <Card
+      title="Blackbox Testing"
+      icon="shield"
+      href="/guides/blackbox-testing"
+    >
+      Perform external security testing against live targets
+    </Card>
+    <Card
+      title="Whitebox Testing"
+      icon="code"
+      href="/guides/whitebox-testing"
+    >
+      Analyze source code for vulnerabilities with full context
+    </Card>
+    <Card
+      title="AI Providers"
+      icon="robot"
+      href="/configuration/ai-providers"
+    >
+      Configure Anthropic, OpenAI, AWS Bedrock, or local vLLM models
+    </Card>
+    <Card
+      title="Docker Setup"
+      icon="docker"
+      href="/guides/docker-setup"
+    >
+      Run Apex in Kali Linux container with pre-configured tools
+    </Card>
+  </CardGroup>
+</div>
 
-## Create beautiful pages
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Key Features</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">What makes Pensar Apex powerful</p>
 
-Everything you need to create world-class documentation.
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="bg-gray-50 dark:bg-[#1a1d27] border border-gray-200 dark:border-[#27272a] rounded-xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 bg-[#cb0404]/10 dark:bg-[#cb0404]/20 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-[#cb0404]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Autonomous Agents</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">AI-powered agents perform sophisticated testing workflows with minimal human intervention</p>
+        </div>
+      </div>
+    </div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    <div className="bg-gray-50 dark:bg-[#1a1d27] border border-gray-200 dark:border-[#27272a] rounded-xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 bg-[#cb0404]/10 dark:bg-[#cb0404]/20 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-[#cb0404]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Attack Surface Discovery</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Automatically map endpoints, pages, and authentication flows for comprehensive coverage</p>
+        </div>
+      </div>
+    </div>
 
-## Need inspiration?
+    <div className="bg-gray-50 dark:bg-[#1a1d27] border border-gray-200 dark:border-[#27272a] rounded-xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 bg-[#cb0404]/10 dark:bg-[#cb0404]/20 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-[#cb0404]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Detailed Reports & POCs</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Generate comprehensive findings with proof-of-concept exploits and remediation guidance</p>
+        </div>
+      </div>
+    </div>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    <div className="bg-gray-50 dark:bg-[#1a1d27] border border-gray-200 dark:border-[#27272a] rounded-xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 bg-[#cb0404]/10 dark:bg-[#cb0404]/20 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-[#cb0404]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Flexible API & CLI</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Use as a CLI tool or integrate into your workflows with the programmatic API</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Resources</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Everything you need to master Pensar Apex</p>
+
+  <CardGroup cols={2}>
+    <Card
+      title="API Reference"
+      icon="code"
+      href="/api/overview"
+    >
+      Complete API documentation for programmatic usage
+    </Card>
+    <Card
+      title="Security & Responsible Use"
+      icon="shield-halved"
+      href="/security/responsible-use"
+    >
+      Guidelines for ethical and legal security testing
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gradient-to-r from-[#cb0404] to-[#e37b84] rounded-2xl p-8 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">Ready to Get Started?</h2>
+    <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
+      Install Pensar Apex and start running autonomous security tests in minutes
+    </p>
+    <a 
+      href="/installation" 
+      className="inline-flex items-center px-8 py-3 rounded-lg bg-white hover:bg-gray-100 text-[#cb0404] font-bold transition-colors no-underline"
+    >
+      Install Now
+      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+      </svg>
+    </a>
+  </div>
+</div>

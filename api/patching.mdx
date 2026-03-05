@@ -1,0 +1,472 @@
+---
+title: Patching
+description: Automatically generate and verify security patches for vulnerabilities
+icon: bandage
+---
+
+## Overview
+
+The Patching API provides intelligent vulnerability remediation capabilities. It analyzes security findings, generates appropriate code fixes, verifies the patches through testing, and prepares pull request metadata.
+
+**Key Features:**
+- Automated patch generation for security vulnerabilities
+- Code analysis and dataflow understanding
+- Lint, type-check, and test verification
+- Sandbox support for isolated patching
+- Pull request metadata generation
+- Multiple file change support
+
+---
+
+## runPatchingAgent
+
+Run the patching agent to fix a security vulnerability in a codebase.
+
+**Patching Workflow:**
+1. **Analyze**: Read and understand the vulnerability details
+2. **Locate**: Find the vulnerable code in the codebase
+3. **Research**: Understand the context and dataflow
+4. **Patch**: Generate and apply appropriate fixes
+5. **Verify**: Run lints, type-checks, and tests
+6. **Document**: Prepare PR metadata with changes
+
+```typescript
+import { runPatchingAgent } from '@pensar/apex/api/patching';
+
+const result = await runPatchingAgent({
+  cwd: '/path/to/project',
+  vulnerability: {
+    name: 'SQL Injection in User Search',
+    severity: 'HIGH',
+    description: 'User input is directly concatenated into SQL query',
+    location: 'src/controllers/userController.ts',
+    startLineNumber: 42,
+    endLineNumber: 45,
+  },
+  model: 'claude-sonnet-4-20250514',
+  session: sessionInfo,
+});
+
+console.log(`Patched ${result.filesChanged.length} files`);
+console.log(`PR Title: ${result.prTitle}`);
+```
+
+### Parameters
+
+<ParamField path="input" type="RunPatchingAgentInput" required>
+  Configuration for the patching agent
+
+  <Expandable title="RunPatchingAgentInput properties">
+    <ParamField path="cwd" type="string" required>
+      Root path of the repository/codebase to patch
+    </ParamField>
+
+    <ParamField path="vulnerability" type="VulnerabilityDetails" required>
+      Details about the vulnerability to fix
+      
+      <Expandable title="VulnerabilityDetails properties">
+        <ParamField path="name" type="string" required>
+          Vulnerability name/title
+        </ParamField>
+        
+        <ParamField path="severity" type="string" required>
+          Severity level (e.g., `"CRITICAL"`, `"HIGH"`, `"MEDIUM"`, `"LOW"`)
+        </ParamField>
+        
+        <ParamField path="description" type="string" required>
+          Detailed description of the vulnerability
+        </ParamField>
+        
+        <ParamField path="location" type="string">
+          File path where the vulnerability exists
+        </ParamField>
+        
+        <ParamField path="startLineNumber" type="number | null">
+          Starting line number of vulnerable code
+        </ParamField>
+        
+        <ParamField path="endLineNumber" type="number | null">
+          Ending line number of vulnerable code
+        </ParamField>
+        
+        <ParamField path="cweMapping" type="string[]">
+          CWE identifiers for the vulnerability (e.g., `["CWE-89"]`)
+        </ParamField>
+        
+        <ParamField path="dataflowAnalysis" type="unknown">
+          Optional dataflow analysis data
+        </ParamField>
+        
+        <ParamField path="poc" type="object">
+          Proof-of-concept exploit information
+          
+          <Expandable title="poc properties">
+            <ParamField path="fileName" type="string">
+              PoC script filename
+            </ParamField>
+            <ParamField path="contents" type="string">
+              PoC script contents
+            </ParamField>
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="model" type="AIModel" required>
+      AI model identifier (e.g., `"claude-sonnet-4-20250514"`)
+    </ParamField>
+
+    <ParamField path="session" type="SessionInfo" required>
+      Session object providing paths for logs, etc.
+    </ParamField>
+
+    <ParamField path="sandbox" type="UnifiedSandbox">
+      Optional pre-configured sandbox for isolated code execution. When provided, all file operations and command executions route through the sandbox instead of the local filesystem.
+    </ParamField>
+
+    <ParamField path="authConfig" type="AIAuthConfig">
+      Optional per-provider API key overrides
+    </ParamField>
+
+    <ParamField path="abortSignal" type="AbortSignal">
+      AbortSignal to cancel patching mid-run
+    </ParamField>
+
+    <ParamField path="consumeCallbacks" type="ConsumeCallbacks">
+      Optional callbacks for stream consumption. Falls back to console logging if not provided.
+      
+      <Expandable title="ConsumeCallbacks properties">
+        <ParamField path="onTextDelta" type="(delta) => void">
+          Called for each text chunk streamed from the AI
+        </ParamField>
+        
+        <ParamField path="onToolCall" type="(delta) => void">
+          Called when the agent invokes a tool
+        </ParamField>
+        
+        <ParamField path="onToolResult" type="(delta) => void">
+          Called when a tool execution completes
+        </ParamField>
+        
+        <ParamField path="onError" type="(error) => void">
+          Called when an error occurs
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="onStepFinish" type="StreamTextOnStepFinishCallback">
+      Callback fired after each agent step completes
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Response
+
+<ResponseField name="filesChanged" type="FileChange[]">
+  List of all files that were modified during patching
+  
+  <Expandable title="FileChange properties">
+    <ResponseField name="filePath" type="string">
+      Path to the file that was changed (relative to `cwd`)
+    </ResponseField>
+    
+    <ResponseField name="changesDescription" type="string">
+      Detailed description of the changes made to the file
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="prTitle" type="string">
+  Suggested title for the pull request
+</ResponseField>
+
+<ResponseField name="prDescription" type="string">
+  Detailed description for the pull request, including:
+  - Summary of the vulnerability
+  - Changes made
+  - Testing performed
+  - Remediation approach
+</ResponseField>
+
+---
+
+## Usage Examples
+
+<CodeGroup>
+
+```typescript Basic Patching
+import { runPatchingAgent } from '@pensar/apex/api/patching';
+import { createSession } from '@pensar/apex/session';
+
+const session = await createSession({
+  name: 'Patch SQLi',
+  targets: [],
+});
+
+const result = await runPatchingAgent({
+  cwd: '/home/user/projects/my-app',
+  vulnerability: {
+    name: 'SQL Injection in User Search',
+    severity: 'HIGH',
+    description: 'User input from search parameter is directly ' +
+                 'concatenated into SQL query without sanitization',
+    location: 'src/controllers/userController.ts',
+    startLineNumber: 42,
+    endLineNumber: 45,
+    cweMapping: ['CWE-89'],
+  },
+  model: 'claude-sonnet-4-20250514',
+  session,
+});
+
+console.log(`Patched ${result.filesChanged.length} files:`);
+result.filesChanged.forEach((file) => {
+  console.log(`  ${file.filePath}: ${file.changesDescription}`);
+});
+
+console.log(`\nPR Title: ${result.prTitle}`);
+console.log(`\nPR Description:\n${result.prDescription}`);
+```
+
+```typescript With Progress Monitoring
+import { runPatchingAgent } from '@pensar/apex/api/patching';
+import { createSession } from '@pensar/apex/session';
+
+const session = await createSession({
+  name: 'Monitored Patch',
+  targets: [],
+});
+
+const result = await runPatchingAgent({
+  cwd: '/path/to/project',
+  vulnerability: {
+    name: 'XSS in Comment Rendering',
+    severity: 'CRITICAL',
+    description: 'User-generated content is rendered without HTML escaping',
+    location: 'src/components/Comment.tsx',
+    startLineNumber: 23,
+  },
+  model: 'claude-sonnet-4-20250514',
+  session,
+  consumeCallbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text),
+    
+    onToolCall: (d) => {
+      console.log(`\n→ ${d.toolName}`);
+      if (d.toolName === 'update_file') {
+        console.log(`  Patching: ${d.args.filePath}`);
+      } else if (d.toolName === 'execute_command') {
+        console.log(`  Running: ${d.args.command}`);
+      }
+    },
+    
+    onToolResult: (d) => {
+      console.log(`✓ ${d.toolName}`);
+    },
+  },
+});
+
+console.log('\nPatch complete!');
+```
+
+```typescript With Sandbox Isolation
+import { runPatchingAgent } from '@pensar/apex/api/patching';
+import { createSandbox } from '@pensar/apex/sandbox';
+import { createSession } from '@pensar/apex/session';
+
+const session = await createSession({
+  name: 'Sandboxed Patch',
+  targets: [],
+});
+
+// Create isolated sandbox with the project
+const sandbox = await createSandbox({
+  type: 'docker',
+  image: 'node:18',
+  workdir: '/app',
+});
+
+// Clone repo into sandbox
+await sandbox.exec('git clone https://github.com/org/repo.git /app');
+await sandbox.exec('cd /app && npm install');
+
+try {
+  // All file operations happen in sandbox
+  const result = await runPatchingAgent({
+    cwd: '/app',
+    vulnerability: {
+      name: 'Path Traversal in File Upload',
+      severity: 'HIGH',
+      description: 'Filename is not validated, allowing path traversal',
+      location: 'src/routes/upload.ts',
+    },
+    model: 'claude-sonnet-4-20250514',
+    session,
+    sandbox,  // All tools execute in sandbox
+  });
+  
+  // Extract patched files from sandbox
+  for (const file of result.filesChanged) {
+    const contents = await sandbox.readFile(file.filePath);
+    // Process or commit the changes
+  }
+} finally {
+  await sandbox.destroy();
+}
+```
+
+```typescript Batch Patching Multiple Vulnerabilities
+import { runPatchingAgent } from '@pensar/apex/api/patching';
+import { createSession } from '@pensar/apex/session';
+
+const session = await createSession({
+  name: 'Batch Patching',
+  targets: [],
+});
+
+const vulnerabilities = [
+  {
+    name: 'SQL Injection in Users API',
+    severity: 'HIGH',
+    description: 'Unparameterized query in user search',
+    location: 'src/api/users.ts',
+    startLineNumber: 34,
+  },
+  {
+    name: 'XSS in Profile Page',
+    severity: 'MEDIUM',
+    description: 'Unescaped user bio rendering',
+    location: 'src/pages/profile.tsx',
+    startLineNumber: 56,
+  },
+];
+
+const allChanges = [];
+
+for (const vuln of vulnerabilities) {
+  console.log(`\nPatching: ${vuln.name}...`);
+  
+  const result = await runPatchingAgent({
+    cwd: '/path/to/project',
+    vulnerability: vuln,
+    model: 'claude-sonnet-4-20250514',
+    session,
+  });
+  
+  allChanges.push(...result.filesChanged);
+  console.log(`✓ Patched ${result.filesChanged.length} files`);
+}
+
+console.log(`\nTotal files changed: ${allChanges.length}`);
+```
+
+```typescript With PoC Exploit Context
+import { runPatchingAgent } from '@pensar/apex/api/patching';
+import { readFileSync } from 'fs';
+import { createSession } from '@pensar/apex/session';
+
+const session = await createSession({
+  name: 'Patch with PoC',
+  targets: [],
+});
+
+// Load PoC script from finding
+const pocPath = '/path/to/findings/sql-injection-poc.py';
+const pocContents = readFileSync(pocPath, 'utf-8');
+
+const result = await runPatchingAgent({
+  cwd: '/path/to/project',
+  vulnerability: {
+    name: 'SQL Injection in Login',
+    severity: 'CRITICAL',
+    description: 'Username parameter is vulnerable to SQL injection',
+    location: 'src/auth/login.ts',
+    startLineNumber: 28,
+    endLineNumber: 32,
+    cweMapping: ['CWE-89'],
+    // Include PoC for context
+    poc: {
+      fileName: 'sql-injection-poc.py',
+      contents: pocContents,
+    },
+  },
+  model: 'claude-sonnet-4-20250514',
+  session,
+});
+
+console.log('Patch applied with PoC context');
+```
+
+</CodeGroup>
+
+---
+
+## Patching Capabilities
+
+### Code Analysis
+
+The patching agent can:
+- Read and understand complex codebases
+- Trace dataflow through functions and modules
+- Identify input validation gaps
+- Understand framework-specific patterns
+- Analyze dependencies and imports
+
+### Patch Generation
+
+Supported remediation patterns:
+- **Input validation**: Add sanitization and validation
+- **Parameterized queries**: Convert to prepared statements
+- **Output encoding**: Add HTML/URL/SQL escaping
+- **Access control**: Add authorization checks
+- **Cryptographic fixes**: Upgrade weak algorithms
+- **Configuration hardening**: Fix insecure defaults
+
+### Verification
+
+After patching, the agent:
+1. Runs linters to ensure code quality
+2. Executes type checkers (TypeScript, mypy, etc.)
+3. Runs existing test suites
+4. Verifies the vulnerability is resolved
+5. Ensures no regressions introduced
+
+---
+
+## Best Practices
+
+### Provide Detailed Context
+
+More context leads to better patches:
+- Include precise line numbers
+- Provide CWE mappings
+- Include PoC scripts when available
+- Add dataflow analysis if available
+
+### Review Generated Patches
+
+Always review patches before merging:
+- Verify the fix addresses the root cause
+- Check for edge cases
+- Ensure coding standards are met
+- Validate test coverage
+
+### Use Sandboxes for Safety
+
+For untrusted codebases:
+- Always use sandbox isolation
+- Never patch production code directly
+- Test patches in staging first
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Pentest" icon="shield-halved" href="/api/blackbox-pentest">
+    Discover vulnerabilities to patch
+  </Card>
+  <Card title="Targeted Pentest" icon="bullseye" href="/api/targeted-pentest">
+    Find specific vulnerabilities
+  </Card>
+</CardGroup>

@@ -1,0 +1,542 @@
+---
+title: 'vLLM Setup'
+description: 'Configure Pensar Apex to use local vLLM models for offline penetration testing'
+icon: 'server'
+---
+
+## Overview
+
+Pensar Apex supports **local vLLM models** for offline penetration testing without relying on cloud API providers. This enables:
+
+- **Air-gapped testing** - Run pentests in isolated networks without internet access
+- **Cost savings** - No per-token API charges
+- **Data privacy** - All inference happens locally
+- **Custom models** - Use fine-tuned models optimized for security testing
+
+<Note>
+  **Anthropic models (Claude) provide the best performance** for penetration testing. vLLM is recommended for specialized use cases where cloud APIs are not feasible.
+</Note>
+
+## What is vLLM?
+
+[vLLM](https://github.com/vllm-project/vllm) is a high-throughput inference engine for large language models. It provides:
+
+- **Fast inference** with PagedAttention and continuous batching
+- **OpenAI-compatible API** - drop-in replacement for OpenAI endpoints
+- **Quantization support** - run large models on consumer GPUs
+- **Multi-GPU support** - scale inference across multiple GPUs
+
+## Quick Start
+
+<Steps>
+  <Step title="Install vLLM">
+    Install vLLM with GPU support:
+
+    ```bash
+    # CUDA 12.1
+    pip install vllm
+
+    # Or with Docker
+    docker pull vllm/vllm-openai:latest
+    ```
+  </Step>
+
+  <Step title="Start vLLM Server">
+    Launch the vLLM server with your chosen model:
+
+    ```bash
+    vllm serve meta-llama/Llama-3.1-70B-Instruct \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --tensor-parallel-size 2  # For multi-GPU
+    ```
+
+    Or with Docker:
+
+    ```bash
+    docker run --gpus all \
+      -p 8000:8000 \
+      vllm/vllm-openai:latest \
+      --model meta-llama/Llama-3.1-70B-Instruct
+    ```
+  </Step>
+
+  <Step title="Configure Apex">
+    Set the `LOCAL_MODEL_URL` environment variable:
+
+    ```bash
+    export LOCAL_MODEL_URL="http://localhost:8000/v1"
+    ```
+
+    Or add to `.env`:
+
+    ```bash
+    # .env
+    LOCAL_MODEL_URL=http://localhost:8000/v1
+    ```
+  </Step>
+
+  <Step title="Select Local Model in Apex">
+    In the Apex TUI, navigate to the **Models** screen:
+
+    1. Enter your model name in the "Custom local model (vLLM)" input
+    2. Example: `meta-llama/Llama-3.1-70B-Instruct`
+    3. The model will now appear in the model selection list
+  </Step>
+
+  <Step title="Run Pentest with Local Model">
+    ```bash
+    pensar pentest \
+      --target https://example.com \
+      --model meta-llama/Llama-3.1-70B-Instruct
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment Variables
+
+Apex detects local model configuration via `LOCAL_MODEL_URL`:
+
+```typescript
+// From src/core/providers/utils.ts
+export function isProviderConfigured(
+  providerId: ProviderType,
+  config: Config,
+): boolean {
+  switch (providerId) {
+    case "local":
+      return !!(
+        config.localModelUrl ||
+        config.localModelName ||
+        process.env.LOCAL_MODEL_URL
+      );
+    // ...
+  }
+}
+```
+
+**Options:**
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `LOCAL_MODEL_URL` | vLLM server endpoint | `http://localhost:8000/v1` |
+| `localModelName` | Model identifier | `meta-llama/Llama-3.1-70B-Instruct` |
+
+### Provider Configuration
+
+```typescript
+// From src/core/providers/types.ts
+{
+  id: "local",
+  name: "Local LLM",
+  description: "OpenAI-compatible local model (vLLM, LM Studio, Ollama)",
+  requiresAPIKey: false,
+}
+```
+
+vLLM endpoints are **OpenAI-compatible**, so no API key is required.
+
+### Model Selection
+
+Apex automatically adds your configured local model to the available models list:
+
+```typescript
+// From src/core/providers/utils.ts
+if (isProviderConfigured("local", config) && config.localModelName) {
+  models.push({
+    id: config.localModelName,
+    name: config.localModelName,
+    provider: "local",
+  });
+}
+```
+
+The model name you provide in the TUI becomes the model ID used for API requests.
+
+## Recommended Models
+
+### For Penetration Testing
+
+These open-source models perform well for security testing:
+
+| Model | Size | VRAM Required | Best For |
+|-------|------|---------------|----------|
+| **Llama 3.1 70B Instruct** | 70B | ~40GB (FP16) | Comprehensive pentesting |
+| **Llama 3.1 8B Instruct** | 8B | ~8GB (FP16) | Quick scans, resource-constrained |
+| **DeepSeek Coder 33B** | 33B | ~20GB (FP16) | Code analysis (whitebox) |
+| **Qwen 2.5 Coder 32B** | 32B | ~20GB (FP16) | Code security reviews |
+| **Mistral Large 2** | 123B | ~70GB (FP16) | Enterprise pentesting |
+
+<Warning>
+  **Open-source models do not match Claude 4.5 Sonnet** in security reasoning and vulnerability detection. Use Anthropic models when possible.
+</Warning>
+
+### Quantization Options
+
+For consumer GPUs, use quantized models:
+
+| Quantization | VRAM Savings | Quality Loss |
+|--------------|--------------|---------------|
+| **FP16** | Baseline | None |
+| **INT8** | ~50% | Minimal |
+| **INT4** | ~75% | Moderate |
+
+Example with quantization:
+
+```bash
+vllm serve TheBloke/Llama-2-70B-Chat-AWQ \
+  --quantization awq \
+  --dtype half
+```
+
+## vLLM Server Setup
+
+### Standalone Server
+
+```bash
+# Install vLLM
+pip install vllm
+
+# Download model (first run)
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+  --download-dir ~/.cache/vllm
+
+# Serve model
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --tensor-parallel-size 4  # Use 4 GPUs
+```
+
+### Docker Deployment
+
+```bash
+# Pull vLLM image
+docker pull vllm/vllm-openai:latest
+
+# Run with GPU access
+docker run --gpus all \
+  --name vllm-server \
+  -p 8000:8000 \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
+  vllm/vllm-openai:latest \
+  --model meta-llama/Llama-3.1-70B-Instruct \
+  --tensor-parallel-size 2
+```
+
+### Docker Compose for vLLM + Apex
+
+```yaml
+# docker-compose.yml
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command:
+      - --model
+      - meta-llama/Llama-3.1-70B-Instruct
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+
+  kali-apex:
+    build: ./container
+    depends_on:
+      - vllm
+    environment:
+      - LOCAL_MODEL_URL=http://vllm:8000/v1
+    network_mode: bridge
+```
+
+Start both services:
+
+```bash
+docker compose up -d
+docker compose exec kali-apex bash
+pensar pentest --target https://example.com --model meta-llama/Llama-3.1-70B-Instruct
+```
+
+### Multi-Node Setup
+
+For large models across multiple machines:
+
+```bash
+# Node 1 (head node)
+vllm serve meta-llama/Llama-3.1-405B-Instruct \
+  --tensor-parallel-size 8 \
+  --pipeline-parallel-size 2
+
+# Apex points to head node
+export LOCAL_MODEL_URL="http://head-node:8000/v1"
+```
+
+## Verifying vLLM Setup
+
+### Test the Endpoint
+
+```bash
+curl http://localhost:8000/v1/models
+```
+
+**Expected output:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "meta-llama/Llama-3.1-70B-Instruct",
+      "object": "model",
+      "created": 1234567890,
+      "owned_by": "vllm"
+    }
+  ]
+}
+```
+
+### Test Completion
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "meta-llama/Llama-3.1-70B-Instruct",
+    "messages": [{"role": "user", "content": "What is SQL injection?"}],
+    "max_tokens": 100
+  }'
+```
+
+### Check Apex Detection
+
+```bash
+# Run Apex doctor
+pensar doctor
+```
+
+**Expected output:**
+```
+AI Provider Configuration:
+- vLLM (local): ✓ Configured (http://localhost:8000/v1)
+```
+
+## Performance Tuning
+
+### GPU Memory Optimization
+
+```bash
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+  --gpu-memory-utilization 0.9 \  # Use 90% of VRAM
+  --max-model-len 4096 \           # Reduce context length
+  --tensor-parallel-size 2         # Split across 2 GPUs
+```
+
+### Batch Processing
+
+```bash
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+  --max-num-batched-tokens 8192 \  # Larger batches
+  --max-num-seqs 256               # More concurrent requests
+```
+
+### Quantization
+
+```bash
+# AWQ quantization (4-bit)
+vllm serve TheBloke/Llama-2-70B-Chat-AWQ \
+  --quantization awq
+
+# GPTQ quantization (4-bit)
+vllm serve TheBloke/Llama-2-70B-Chat-GPTQ \
+  --quantization gptq
+```
+
+## Troubleshooting
+
+### "LOCAL_MODEL_URL not detected"
+
+**Cause:** Environment variable not set.
+
+**Solution:**
+```bash
+export LOCAL_MODEL_URL="http://localhost:8000/v1"
+# Or add to ~/.bashrc or container/.env
+```
+
+### "Connection refused" to vLLM
+
+**Cause:** vLLM server not running or wrong port.
+
+**Solution:**
+1. Check vLLM is running: `curl http://localhost:8000/v1/models`
+2. Verify port: `netstat -tuln | grep 8000`
+3. Check Docker networking if using containers:
+   ```bash
+   docker network inspect bridge
+   ```
+
+### "Out of memory" on vLLM
+
+**Cause:** Model too large for available VRAM.
+
+**Solutions:**
+1. Use a smaller model (8B instead of 70B)
+2. Enable quantization (INT8 or INT4)
+3. Reduce `--gpu-memory-utilization` to 0.8
+4. Reduce `--max-model-len` to limit context size
+5. Add more GPUs with `--tensor-parallel-size`
+
+### "Model not found" in Apex
+
+**Cause:** Model name mismatch between vLLM and Apex.
+
+**Solution:**
+1. Check the exact model ID from vLLM:
+   ```bash
+   curl http://localhost:8000/v1/models
+   ```
+2. Use that exact ID in Apex:
+   ```bash
+   pensar pentest --target https://example.com --model <exact-id>
+   ```
+
+### Slow inference
+
+**Cause:** Model too large, insufficient GPU compute.
+
+**Solutions:**
+1. Use a smaller/faster model (8B or 13B)
+2. Enable quantization
+3. Increase `--tensor-parallel-size` to use more GPUs
+4. Check GPU utilization: `nvidia-smi`
+
+## Comparing Cloud vs Local Models
+
+| Feature | Anthropic (Cloud) | vLLM (Local) |
+|---------|-------------------|---------------|
+| **Performance** | ⭐⭐⭐⭐⭐ Best | ⭐⭐⭐ Good |
+| **Setup** | Simple (API key) | Complex (GPU server) |
+| **Cost** | Per-token charges | Hardware + electricity |
+| **Privacy** | Data sent to Anthropic | 100% local |
+| **Availability** | Requires internet | Air-gapped OK |
+| **Latency** | ~2-5s per request | ~1-10s (varies by GPU) |
+| **Context Length** | 200k tokens | 4k-32k (model dependent) |
+
+<Note>
+  **Use Anthropic for production pentests.** vLLM is best for:
+  - Air-gapped environments
+  - High-volume testing (cost savings)
+  - Custom fine-tuned models
+  - Data sovereignty requirements
+</Note>
+
+## Advanced: Fine-Tuning for Security
+
+To create a custom security-focused model:
+
+<Steps>
+  <Step title="Prepare Training Data">
+    Collect vulnerability reports, exploit descriptions, and security documentation:
+
+    ```json
+    [
+      {
+        "prompt": "Analyze this code for SQL injection vulnerabilities:",
+        "completion": "The query concatenates user input directly..."
+      }
+    ]
+    ```
+  </Step>
+
+  <Step title="Fine-Tune Base Model">
+    Use frameworks like Axolotl or LLaMA Factory:
+
+    ```bash
+    python -m axolotl train config.yml
+    ```
+  </Step>
+
+  <Step title="Serve Fine-Tuned Model">
+    ```bash
+    vllm serve ./my-security-model \
+      --host 0.0.0.0 \
+      --port 8000
+    ```
+  </Step>
+
+  <Step title="Use in Apex">
+    ```bash
+    export LOCAL_MODEL_URL="http://localhost:8000/v1"
+    pensar pentest --target https://example.com --model my-security-model
+    ```
+  </Step>
+</Steps>
+
+## Alternative Local Inference Engines
+
+vLLM is recommended, but Apex also supports other OpenAI-compatible servers:
+
+### Ollama
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3.1:70b
+
+# Serve with OpenAI compatibility
+ollama serve --host 0.0.0.0:11434
+
+# Configure Apex
+export LOCAL_MODEL_URL="http://localhost:11434/v1"
+```
+
+### LM Studio
+
+1. Download [LM Studio](https://lmstudio.ai/)
+2. Load a model
+3. Start the local server (port 1234 by default)
+4. Configure Apex:
+   ```bash
+   export LOCAL_MODEL_URL="http://localhost:1234/v1"
+   ```
+
+### Text Generation Inference (TGI)
+
+```bash
+docker run --gpus all \
+  -p 8000:80 \
+  ghcr.io/huggingface/text-generation-inference:latest \
+  --model-id meta-llama/Llama-3.1-70B-Instruct
+
+export LOCAL_MODEL_URL="http://localhost:8000/v1"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Blackbox Testing" icon="shield-halved" href="/guides/blackbox-testing">
+    Run blackbox pentests with your local model
+  </Card>
+  <Card title="Whitebox Testing" icon="code" href="/guides/whitebox-testing">
+    Analyze source code using local inference
+  </Card>
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Deploy vLLM + Apex in containers
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Test auth flows with local models
+  </Card>
+</CardGroup>

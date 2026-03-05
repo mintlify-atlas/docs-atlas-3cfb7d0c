@@ -1,0 +1,322 @@
+---
+title: 'pensar'
+description: 'Launch the interactive Terminal UI for guided penetration testing'
+---
+
+The `pensar` command (with no subcommand) launches the interactive Terminal UI (TUI), providing a full visual interface for penetration testing workflows.
+
+## Syntax
+
+```bash
+pensar
+```
+
+## Description
+
+The TUI provides an interactive environment for:
+
+- **Guided Pentesting**: Step-by-step workflows for blackbox and whitebox testing
+- **Session Management**: View, resume, and organize past pentest sessions
+- **Real-time Chat**: Interact with AI agents during security assessments
+- **Visual Dashboard**: Monitor agent progress, findings, and system status
+- **Configuration**: Manage AI providers, models, and tool settings
+
+## Features
+
+### First-Time Setup
+
+On first launch, the TUI guides you through:
+
+1. **Responsible Use Disclosure**: Review and accept ethical hacking guidelines
+2. **Provider Configuration**: Set up AI provider API keys if not already configured
+
+### Main Interface
+
+The TUI offers multiple screens accessible via keyboard shortcuts:
+
+<Tabs>
+  <Tab title="Chat">
+    Interactive chat interface with AI security agents. Send messages, review findings, and collaborate on vulnerability discovery.
+    
+    **Key Features**:
+    - Real-time streaming responses
+    - Tool call visualization
+    - Finding annotations
+    - Session context preservation
+  </Tab>
+  
+  <Tab title="Sessions">
+    Browse and manage all pentest sessions.
+    
+    **Key Features**:
+    - View session history
+    - Resume previous pentests
+    - Review findings from past sessions
+    - Delete or archive sessions
+  </Tab>
+  
+  <Tab title="Operator Dashboard">
+    Launch and monitor autonomous pentest workflows.
+    
+    **Key Features**:
+    - Start blackbox/whitebox pentests
+    - Configure testing parameters
+    - Monitor agent progress
+    - View live findings
+  </Tab>
+  
+  <Tab title="Configuration">
+    Manage system settings and preferences.
+    
+    **Key Features**:
+    - AI provider management
+    - Model selection
+    - Theme customization
+    - Keyboard shortcuts
+  </Tab>
+</Tabs>
+
+## Keyboard Shortcuts
+
+<Note>
+  Press `Ctrl+P` at any time to see all available shortcuts.
+</Note>
+
+### Global Navigation
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+P` | Open command palette |
+| `Ctrl+N` | New chat session |
+| `Ctrl+S` | View sessions |
+| `Ctrl+T` | Toggle theme |
+| `Ctrl+C` | Exit / Cancel |
+| `Esc` | Close dialog / Go back |
+
+### Chat Interface
+
+| Shortcut | Action |
+|----------|--------|
+| `Enter` | Send message |
+| `Shift+Enter` | New line |
+| `↑` / `↓` | Navigate message history |
+| `Ctrl+L` | Clear chat |
+
+## Configuration Files
+
+The TUI stores configuration in:
+
+```
+~/.pensar/
+├── config.json          # User preferences and API keys
+├── sessions/            # Session data and history
+│   ├── <session-id>/
+│   │   ├── findings.json
+│   │   ├── pocs/
+│   │   └── report.md
+└── logs/                # Error logs and diagnostics
+```
+
+## Examples
+
+### Launch TUI
+
+```bash
+pensar
+```
+
+<Frame>
+  <img src="/images/tui-main.png" alt="Pensar TUI Main Screen" />
+</Frame>
+
+### First-Time Setup Flow
+
+```bash
+$ pensar
+
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║              RESPONSIBLE USE DISCLOSURE                  ║
+║                                                          ║
+║  Pensar is designed for authorized security testing     ║
+║  only. You must have explicit permission to test any    ║
+║  system or network.                                      ║
+║                                                          ║
+║  Press Enter to accept and continue...                   ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
+```
+
+After accepting, if no AI provider is configured:
+
+```bash
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║                   PROVIDER SETUP                         ║
+║                                                          ║
+║  No AI provider configured. Please set up at least      ║
+║  one provider to continue.                               ║
+║                                                          ║
+║  → Anthropic                                             ║
+║    OpenAI                                                ║
+║    OpenRouter                                            ║
+║    AWS Bedrock                                           ║
+║    Local vLLM                                            ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
+```
+
+### Normal TUI Session
+
+```bash
+$ pensar
+
+┌─────────────────────────────────────────────────────────┐
+│ Pensar Apex v0.0.79                                     │
+│                                                         │
+│ Chat       Sessions       Operator       Config         │
+│ ────       ────────       ────────       ──────         │
+│                                                         │
+│ > Start a new pentest or ask me anything...            │
+│                                                         │
+│                                                         │
+│                                                         │
+│                                                         │
+│                                                         │
+│ [Type message] Ctrl+P: Commands  Ctrl+C: Exit          │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Use Cases
+
+### 1. Interactive Pentest Learning
+
+Start conversations with AI agents to learn about:
+- Vulnerability discovery techniques
+- Exploitation methodologies
+- Security best practices
+
+```bash
+pensar
+# Then in chat:
+> Explain how to test for SQL injection in a login form
+```
+
+### 2. Manual Vulnerability Research
+
+Use the TUI to manually explore targets with AI assistance:
+
+```bash
+pensar
+# Navigate to Operator Dashboard
+# Configure target and testing parameters
+# Launch guided pentest workflow
+```
+
+### 3. Session Review and Reporting
+
+Review past pentest findings:
+
+```bash
+pensar
+# Press Ctrl+S to view sessions
+# Select a session to review findings
+# Export reports or continue testing
+```
+
+## Troubleshooting
+
+### TUI Won't Launch
+
+```bash
+# Check for errors
+pensar doctor
+
+# Verify terminal compatibility
+echo $TERM
+# Should show: xterm-256color, screen-256color, etc.
+```
+
+### Display Issues
+
+If you experience rendering problems:
+
+1. Ensure your terminal supports 256 colors
+2. Try a different theme: `Ctrl+T` in the TUI
+3. Resize your terminal window (minimum 80x24)
+
+### Performance Issues
+
+For slow TUI performance:
+
+```bash
+# Use CLI commands instead for better performance
+pensar pentest --target https://example.com
+```
+
+## Environment Variables
+
+The TUI respects these environment variables:
+
+<ParamField path="ANTHROPIC_API_KEY" type="string">
+  Anthropic API key for Claude models (recommended)
+</ParamField>
+
+<ParamField path="OPENAI_API_KEY" type="string">
+  OpenAI API key for GPT models
+</ParamField>
+
+<ParamField path="OPENROUTER_API_KEY" type="string">
+  OpenRouter API key for multi-model access
+</ParamField>
+
+<ParamField path="NO_COLOR" type="flag">
+  Disable colored output (for accessibility)
+</ParamField>
+
+## Advanced Configuration
+
+### Custom Themes
+
+The TUI supports multiple themes:
+
+- **Apex** (default)
+- Catppuccin
+- Dracula
+- Tokyo Night
+- Nord
+- Gruvbox
+- And more...
+
+Change themes via `Ctrl+T` or in the Config menu.
+
+### Keyboard Customization
+
+Edit `~/.pensar/config.json` to customize shortcuts:
+
+```json
+{
+  "keybindings": {
+    "newSession": "ctrl+n",
+    "viewSessions": "ctrl+s",
+    "commandPalette": "ctrl+p"
+  }
+}
+```
+
+## Related Commands
+
+- [pentest](/commands/pentest) - Run automated pentests from CLI
+- [targeted-pentest](/commands/targeted-pentest) - Focused vulnerability testing
+- [doctor](/commands/doctor) - Check system configuration
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/getting-started">
+    Complete setup guide for first-time users
+  </Card>
+  <Card title="Workflows" icon="diagram-project" href="/workflows">
+    Learn about pentest workflows and methodologies
+  </Card>
+</CardGroup>

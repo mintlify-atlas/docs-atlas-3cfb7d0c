@@ -1,0 +1,263 @@
+---
+title: Reporting Security Vulnerabilities
+description: How to responsibly report security issues in Pensar Apex
+---
+
+If you discover a security vulnerability in Pensar Apex, we appreciate your responsible disclosure. This page explains how to report issues and what to expect from the process.
+
+<Warning>
+Do not open a public GitHub issue for security vulnerabilities. Use the confidential reporting process described below.
+</Warning>
+
+## How to Report
+
+Send security vulnerability reports to:
+
+**Email:** [security@pensarai.com](mailto:security@pensarai.com)
+
+### What to Include
+
+Please provide as much detail as possible to help us understand and validate the issue:
+
+**Description of the vulnerability**
+- What component or feature is affected
+- Type of vulnerability (RCE, credential leak, etc.)
+- Attack vector and preconditions
+
+**Steps to reproduce the issue**
+- Detailed reproduction steps
+- Minimal test case or proof of concept
+- Required configuration or environment setup
+- Expected vs. actual behavior
+
+**Potential impact you've identified**
+- What an attacker could accomplish
+- Affected user scenarios
+- Scope of the vulnerability
+- Any mitigating factors
+
+**Your suggested fix (if you have one)**
+- Proposed code changes or approach
+- Alternative mitigations
+- References to similar fixes in other projects
+
+<Note>
+You don't need to provide a complete fix. Even partial suggestions or ideas are helpful.
+</Note>
+
+## What to Expect
+
+### Acknowledgment
+
+We will acknowledge receipt of your report within **48 hours**.
+
+If you don't receive an acknowledgment within this timeframe, please follow up to ensure your report was received.
+
+### Validation and Communication
+
+We will work with you to:
+- Understand and validate the issue
+- Assess severity and impact
+- Develop and test a fix
+- Plan coordinated disclosure
+
+You will be kept informed of our progress toward a fix, including:
+- Validation results and severity assessment
+- Estimated timeline for patch development
+- Release planning and disclosure timeline
+- Any additional information we need
+
+### Coordinated Disclosure
+
+We follow responsible disclosure practices:
+
+1. **Private validation:** We confirm and assess the vulnerability privately
+2. **Fix development:** We develop and test a patch
+3. **Pre-disclosure notification:** We may provide advance notice to critical users
+4. **Public release:** We release the fix and publish a security advisory
+5. **Credit:** We acknowledge the reporter (if desired) in the advisory
+
+We request that you:
+- Keep the vulnerability confidential until we release a fix
+- Provide reasonable time for us to develop and deploy a patch
+- Coordinate with us on disclosure timing and content
+
+## Scope
+
+This security policy applies to the latest version of the project on the **`canary`** branch.
+
+### In Scope
+
+The following components are security-relevant and fully in scope for vulnerability reports:
+
+**Shipped CLI and TUI**
+- The distributed command-line interface and terminal UI
+- Compiled artifacts in `build/` and `bin/`
+- Code included in the distributed npm package
+
+**Published npm package**
+- All artifacts distributed via the `@pensar/apex` npm package
+- Dependencies bundled with the package
+- Installation and update mechanisms
+
+**Authentication, authorization, and session logic**
+- Credential storage and encryption (`src/core/credentials/`)
+- Session management (`src/core/session/`)
+- API key handling
+- Authentication with external services
+
+**Components that process untrusted external input**
+- Network protocol handling
+- Response parsing from test targets
+- User input validation
+- File parsing and processing
+
+### Limited Scope
+
+The following components are evaluated under a **restricted threat model** with contextual severity:
+
+**Developer tooling and internal scripts**
+- Scripts in `scripts/` directory
+- Benchmark runners
+- CI utilities and workflows (`.github/workflows/`)
+
+**Test harnesses and local development utilities**
+- Test files (`*.test.ts`)
+- Development-only dependencies
+- Local setup and configuration tools
+
+**Non-distributed components**
+- Code excluded by `package.json` `files` field
+- Code excluded by `.npmignore`
+- Components not shipped in the npm package
+
+<Note>
+Issues in limited-scope components are evaluated based on realistic threat models aligned with their intended usage. Severity reflects actual product exposure and blast radius, not theoretical worst-case impact.
+</Note>
+
+### Out of Scope
+
+The following are generally considered **out of scope** and may be closed as informational:
+
+**Local source code modification**
+- Issues requiring the reporter to modify source code
+- Attacks that only work after changing local files
+- Malicious commits or local repository tampering
+
+**Self-compromise scenarios**
+- A user injecting malicious content into their own files
+- Users intentionally misconfiguring security settings
+- Attacks requiring the victim to be the attacker
+
+**Excessive privilege requirements**
+- Attacks requiring existing repository write access
+- Attacks requiring local filesystem access beyond normal tool usage
+- Issues that only affect users who already have administrative access
+
+**Theoretical vulnerabilities**
+- No practical, realistic exploitation path
+- Requires extensive preconditions unlikely in practice
+- Purely academic issues without demonstrable impact
+
+**Best-practice suggestions**
+- Security recommendations without demonstrable vulnerability
+- Hardening suggestions without actual weakness
+- Compliance or policy improvements
+
+**Non-shipped code**
+- Findings in experimental features not yet released
+- Issues in example code or scaffolding
+- Vulnerabilities in deprecated or removed components
+
+**Violations of documented assumptions**
+- Issues that require violating operational assumptions (see [Threat Model](/security/threat-model))
+- Attacks outside intended usage patterns
+- Misuse of development-only features in production
+
+<Warning>
+We reserve the right to classify reports as informational if they do not present meaningful security impact within the intended product threat model.
+</Warning>
+
+## Severity Classification
+
+Severity is determined based on multiple factors:
+
+### Product Exposure
+
+**Is the affected component shipped to users?**
+- Shipped in npm package: Higher severity
+- Development-only tool: Lower severity
+- Not distributed: Informational or out of scope
+
+### Realistic Attack Surface
+
+**Does the vulnerability arise during normal, intended usage?**
+- Normal penetration testing workflow: In scope
+- Unusual configuration or development mode: Lower severity
+- Requires source modification: Out of scope
+
+### Blast Radius
+
+**What is the scope of potential impact?**
+- **Critical:** Credential theft, arbitrary code execution as different user
+- **High:** Code execution in user context, sensitive data exposure
+- **Medium:** Information disclosure of findings, privilege escalation within tool
+- **Low:** Denial of service, minor information leaks
+
+### Alignment with Intended Usage
+
+**Does exploitation require deviating from documented workflows?**
+- Normal operation: Full severity
+- Undocumented features or flags: Reduced severity
+- Development-mode only: Limited scope
+- Source modification required: Out of scope
+
+<Note>
+Local-only code execution within internal developer tooling does not automatically equate to production remote code execution. Severity classifications reflect the actual deployment context and user exposure of affected components.
+</Note>
+
+## Operational Risk vs. Vulnerabilities
+
+Pensar Apex is a penetration testing tool that intentionally interacts with potentially hostile systems. Understanding the difference between vulnerabilities and operational risk is important.
+
+### These Are Vulnerabilities
+
+- Input validation flaws allowing target systems to execute code in Apex
+- Credential leaks or insecure storage
+- Session isolation failures allowing cross-session data exposure
+- Injection vulnerabilities in Apex's own code
+- Authentication bypasses in Apex's services
+
+### These Are Operational Risks (Not Vulnerabilities)
+
+- Target systems fingerprinting Apex during normal scanning
+- Malicious targets rate-limiting or blocking Apex
+- Hostile services returning deceptive results
+- Targets attempting to retaliate against scanning infrastructure
+- Honeypots detecting and misleading the tool
+
+For more details, see the [Threat Model](/security/threat-model) page, particularly the section on Operational Risk Assumptions.
+
+## Acknowledgment
+
+We appreciate responsible security research. Valid, in-scope reports will be acknowledged in accordance with this policy.
+
+**What we provide:**
+- Prompt acknowledgment and communication
+- Credit in security advisories (if desired)
+- Collaboration on understanding and fixing the issue
+- Recognition for helping secure Apex
+
+**What we don't provide:**
+- Monetary bug bounties
+- Swag or merchandise
+- Public recognition beyond security advisories
+- Individual thank-you pages or hall of fame
+
+We follow a consistent, process-driven approach to disclosure and do not provide additional recognition beyond our standard acknowledgment process.
+
+## Thank You
+
+Thank you for helping keep Apex and its users safe. Responsible disclosure is essential to maintaining security, and we value the research community's contributions to making our software better.
+
+If you have questions about this policy or whether a potential issue is in scope, feel free to reach out to [security@pensarai.com](mailto:security@pensarai.com) before investing significant time in research.

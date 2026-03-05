@@ -1,0 +1,466 @@
+---
+title: "pensar auth"
+description: "Authenticate to target applications and verify authentication mechanisms"
+---
+
+The `pensar auth` command automates authentication to web applications, handling login flows, token verification, and auth mechanism discovery.
+
+## Synopsis
+
+```bash
+pensar auth --target <url> [options]
+```
+
+## Description
+
+The auth command helps you:
+
+- Automatically authenticate to applications
+- Discover authentication mechanisms
+- Verify bearer tokens and API keys
+- Test existing session cookies
+- Export authentication data for pentesting
+
+<Note>
+Authentication data is securely stored and never exposed to AI models. Only authentication results and metadata are processed by AI.
+</Note>
+
+## Required Arguments
+
+<ParamField path="--target" type="string" required>
+  Target URL to authenticate against.
+
+  ```bash
+  pensar auth --target https://app.example.com
+  ```
+
+  Should point to the application's authentication endpoint or base URL.
+</ParamField>
+
+## Authentication Options
+
+<ParamField path="--username" type="string">
+  Username for login.
+
+  ```bash
+  pensar auth --target https://app.example.com --username admin
+  ```
+
+  Used for form-based or API authentication.
+</ParamField>
+
+<ParamField path="--password" type="string">
+  Password for login.
+
+  ```bash
+  pensar auth \
+    --target https://app.example.com \
+    --username admin \
+    --password SecurePass123
+  ```
+
+  <Warning>
+  Passwords are never sent to AI models. They're only used by browser automation tools.
+  </Warning>
+</ParamField>
+
+<ParamField path="--api-key" type="string">
+  API key for authentication.
+
+  ```bash
+  pensar auth \
+    --target https://api.example.com \
+    --api-key sk-1234567890abcdef
+  ```
+
+  Tests API key authentication schemes.
+</ParamField>
+
+<ParamField path="--bearer" type="string">
+  Bearer token to verify.
+
+  ```bash
+  pensar auth \
+    --target https://api.example.com \
+    --bearer "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  ```
+
+  Verifies an existing JWT or bearer token.
+</ParamField>
+
+<ParamField path="--cookies" type="string">
+  Existing session cookies to verify.
+
+  ```bash
+  pensar auth \
+    --target https://app.example.com \
+    --cookies "session=abc123; user_id=456"
+  ```
+
+  Tests if existing cookies grant authenticated access.
+</ParamField>
+
+## Configuration Options
+
+<ParamField path="--model" type="string" default="claude-sonnet-4-5">
+  AI model to use for authentication discovery.
+
+  ```bash
+  pensar auth --target ... --model claude-opus-4
+  ```
+</ParamField>
+
+<ParamField path="--no-browser" type="boolean">
+  Disable browser automation tools.
+
+  ```bash
+  pensar auth --target ... --username ... --password ... --no-browser
+  ```
+
+  Forces API-based authentication only (faster but may not work for complex login flows).
+</ParamField>
+
+<ParamField path="--discover-only" type="boolean">
+  Only discover authentication requirements without attempting login.
+
+  ```bash
+  pensar auth --target https://app.example.com --discover-only
+  ```
+
+  Useful for understanding auth requirements before providing credentials.
+</ParamField>
+
+## Examples
+
+### Discover Authentication
+
+Learn what authentication is required:
+
+```bash
+pensar auth --target https://app.example.com --discover-only
+```
+
+<Accordion title="Example Output">
+```
+==========================================================
+AUTHENTICATION DISCOVERY
+==========================================================
+Target: https://app.example.com
+
+→ Analyzing authentication mechanisms...
+✓ Detected: Form-based login
+  Login URL: https://app.example.com/login
+  Fields: username, password
+  Method: POST
+
+→ Additional requirements:
+  - CSRF token required
+  - reCAPTCHA present (may need manual bypass)
+
+To authenticate:
+  pensar auth \
+    --target https://app.example.com \
+    --username <user> \
+    --password <pass>
+```
+</Accordion>
+
+### Form-Based Login
+
+Authenticate with username/password:
+
+```bash
+pensar auth \
+  --target https://app.example.com \
+  --username testuser \
+  --password testpass123
+```
+
+<Accordion title="Example Output">
+```
+==========================================================
+AUTHENTICATION
+==========================================================
+Target:   https://app.example.com
+Method:   Form-based login
+Username: testuser
+
+→ Navigating to login page...
+✓ Found login form
+→ Filling credentials...
+→ Submitting form...
+✓ Login successful
+
+→ Extracting session data...
+✓ Session cookies captured
+✓ Auth tokens extracted
+
+Authentication data saved to:
+  ~/.pensar/auth/app.example.com/session.json
+
+Exported data:
+  - Cookies: session=..., csrf_token=...
+  - Headers: Authorization: Bearer eyJ...
+  - Valid until: 2024-03-05 18:30:00 UTC
+
+Use this session for pentesting:
+  pensar pentest --target https://app.example.com --auth-file ~/.pensar/auth/app.example.com/session.json
+```
+</Accordion>
+
+### API Key Verification
+
+Test if an API key is valid:
+
+```bash
+pensar auth \
+  --target https://api.example.com \
+  --api-key sk-1234567890abcdef
+```
+
+### Bearer Token Verification
+
+Verify a JWT token:
+
+```bash
+pensar auth \
+  --target https://api.example.com \
+  --bearer "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+```
+
+<Accordion title="Example Output">
+```
+==========================================================
+TOKEN VERIFICATION
+==========================================================
+Target: https://api.example.com
+
+→ Testing bearer token...
+✓ Token is valid
+→ Decoding JWT...
+
+Token details:
+  - Algorithm: HS256
+  - Subject: 1234567890
+  - Name: John Doe
+  - Issued: 2018-01-18 01:30:22 UTC
+  - Expires: Not set (does not expire)
+
+Permissions:
+  - Access to: /api/users, /api/posts
+  - Role: admin
+
+⚠ Warning: Token does not expire (security risk)
+```
+</Accordion>
+
+### Session Cookie Verification
+
+Test existing cookies:
+
+```bash
+pensar auth \
+  --target https://app.example.com \
+  --cookies "session_id=abc123xyz; remember_token=def456"
+```
+
+### OAuth Authentication
+
+For OAuth flows, use discovery first:
+
+```bash
+# Discover OAuth requirements
+pensar auth --target https://app.example.com --discover-only
+
+# Follow instructions for OAuth (browser-based flow)
+pensar auth --target https://app.example.com
+```
+
+## Authentication Methods Supported
+
+<Tabs>
+  <Tab title="Form-Based">
+    Traditional HTML form login:
+
+    ```bash
+    pensar auth \
+      --target https://app.example.com \
+      --username user \
+      --password pass
+    ```
+
+    Handles:
+    - CSRF tokens
+    - Hidden form fields
+    - POST/GET methods
+    - Session cookies
+  </Tab>
+
+  <Tab title="JSON API">
+    REST API authentication:
+
+    ```bash
+    pensar auth \
+      --target https://api.example.com \
+      --username user \
+      --password pass
+    ```
+
+    Sends JSON:
+    ```json
+    POST /api/auth/login
+    {"username": "user", "password": "pass"}
+    ```
+  </Tab>
+
+  <Tab title="Bearer Token">
+    JWT or bearer token verification:
+
+    ```bash
+    pensar auth \
+      --target https://api.example.com \
+      --bearer "eyJ..."
+    ```
+
+    Tests:
+    - Token validity
+    - Expiration
+    - Permissions
+    - Signature
+  </Tab>
+
+  <Tab title="API Key">
+    API key authentication:
+
+    ```bash
+    pensar auth \
+      --target https://api.example.com \
+      --api-key "sk-123..."
+    ```
+
+    Tests various header formats:
+    - `Authorization: Bearer sk-123`
+    - `X-API-Key: sk-123`
+    - `api_key=sk-123` (query param)
+  </Tab>
+
+  <Tab title="OAuth 2.0">
+    OAuth flows (browser required):
+
+    ```bash
+    pensar auth --target https://app.example.com
+    ```
+
+    Opens browser for:
+    - Authorization code flow
+    - Implicit flow
+    - PKCE flow
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Pentesting Authenticated Apps" icon="shield">
+    Get auth data before running pentest
+  </Card>
+  <Card title="Token Validation" icon="key">
+    Verify JWT tokens and API keys
+  </Card>
+  <Card title="Auth Flow Testing" icon="arrows-turn-right">
+    Test OAuth and complex auth flows
+  </Card>
+  <Card title="Session Management" icon="clock-rotate-left">
+    Reuse sessions across multiple pentests
+  </Card>
+</CardGroup>
+
+## Exported Authentication Data
+
+Authentication data is saved to `~/.pensar/auth/<domain>/session.json`:
+
+```json
+{
+  "target": "https://app.example.com",
+  "method": "form-based",
+  "authenticated": true,
+  "cookies": {
+    "session": "abc123...",
+    "csrf_token": "xyz789..."
+  },
+  "headers": {
+    "Authorization": "Bearer eyJ..."
+  },
+  "expires": "2024-03-05T18:30:00Z",
+  "permissions": ["read:users", "write:posts"]
+}
+```
+
+Use in pentest:
+
+```bash
+pensar pentest \
+  --target https://app.example.com \
+  --auth-file ~/.pensar/auth/app.example.com/session.json
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Login failed">
+    Common causes:
+
+    1. **Incorrect credentials** - Verify username/password
+    2. **CAPTCHA present** - May require manual solving
+    3. **Rate limiting** - Target may block automated login
+    4. **MFA required** - See [Authentication Guide](/guides/authentication) for MFA support
+  </Accordion>
+
+  <Accordion title="Token verification failed">
+    Check:
+
+    ```bash
+    # Verify token format
+    echo "$TOKEN" | base64 -d
+
+    # Check if token is expired
+    # (JWT expiration is in 'exp' claim)
+    ```
+
+    Use [jwt.io](https://jwt.io) to decode and inspect tokens.
+  </Accordion>
+
+  <Accordion title="Browser automation not working">
+    Try without browser:
+
+    ```bash
+    pensar auth \
+      --target ... \
+      --username ... \
+      --password ... \
+      --no-browser
+    ```
+
+    Or ensure browser dependencies are installed:
+    ```bash
+    pensar doctor
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication Guide" icon="key" href="/guides/authentication">
+    Learn about advanced auth scenarios
+  </Card>
+  <Card title="Run Pentest" icon="shield" href="/commands/pentest">
+    Use auth data for authenticated pentesting
+  </Card>
+  <Card title="Sessions" icon="folder" href="/configuration/sessions">
+    Manage authentication sessions
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Programmatic authentication API
+  </Card>
+</CardGroup>

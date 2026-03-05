@@ -1,0 +1,349 @@
+---
+title: "pensar benchmark"
+description: "Run comparative benchmarks across repository branches to test code security"
+---
+
+The `pensar benchmark` command runs automated security benchmarks across different branches of a repository, comparing vulnerability counts and security posture between code versions.
+
+## Synopsis
+
+```bash
+pensar benchmark <repo-path> [options] [branch1 branch2 ...]
+```
+
+## Description
+
+Benchmark mode performs automated pentests on specified branches of a repository, allowing you to:
+
+- Compare security posture across branches
+- Track vulnerability trends over development cycles
+- Validate that security fixes reduce vulnerabilities
+- Test multiple code versions efficiently
+
+<Warning>
+Benchmark mode requires local access to a git repository with the source code.
+</Warning>
+
+## Arguments
+
+<ParamField path="repo-path" type="string" required>
+  Path to the git repository to benchmark.
+
+  ```bash
+  pensar benchmark /path/to/vulnerable-app
+  ```
+
+  Must be a valid git repository with at least one branch.
+</ParamField>
+
+<ParamField path="branches" type="string[]">
+  Specific branches to benchmark (optional).
+
+  ```bash
+  pensar benchmark /path/to/app main develop feature/auth
+  ```
+
+  If not specified, uses `--all-branches` behavior or defaults to current branch.
+</ParamField>
+
+## Options
+
+<ParamField path="--all-branches" type="boolean">
+  Test all branches in the repository.
+
+  ```bash
+  pensar benchmark /path/to/app --all-branches
+  ```
+
+  Useful for comprehensive security audits across entire codebase history.
+</ParamField>
+
+<ParamField path="--limit" type="number">
+  Limit the number of branches to test.
+
+  ```bash
+  pensar benchmark /path/to/app --all-branches --limit 5
+  ```
+
+  Tests only the first N branches (by git branch listing order).
+</ParamField>
+
+<ParamField path="--skip" type="number">
+  Skip the first N branches.
+
+  ```bash
+  pensar benchmark /path/to/app --all-branches --skip 3 --limit 5
+  ```
+
+  Useful for paginating through large branch lists.
+</ParamField>
+
+<ParamField path="--model" type="string" default="claude-sonnet-4-5">
+  AI model to use for benchmarking.
+
+  ```bash
+  pensar benchmark /path/to/app --model claude-opus-4
+  ```
+
+  Higher-capability models may find more vulnerabilities but cost more.
+</ParamField>
+
+## Examples
+
+### Basic Branch Comparison
+
+Compare security posture between two branches:
+
+```bash
+pensar benchmark /path/to/webapp main develop
+```
+
+<Accordion title="Example Output">
+```
+==========================================================
+BENCHMARK RESULTS
+==========================================================
+
+Branch: main
+  Findings: 12 (3 CRITICAL, 5 HIGH, 3 MEDIUM, 1 LOW)
+  Time: 8m 32s
+
+Branch: develop
+  Findings: 8 (2 CRITICAL, 3 HIGH, 2 MEDIUM, 1 LOW)
+  Time: 7m 18s
+
+Comparison:
+  develop has 4 fewer vulnerabilities than main
+  CRITICAL reduced by 1
+  HIGH reduced by 2
+
+Results saved to:
+  ~/.pensar/benchmarks/2024-03-05_webapp/
+```
+</Accordion>
+
+### Test All Branches (Limited)
+
+Benchmark the 3 most recent branches:
+
+```bash
+pensar benchmark /path/to/api --all-branches --limit 3
+```
+
+### Feature Branch Validation
+
+Test if a security fix reduces vulnerabilities:
+
+```bash
+# Test before fix
+pensar benchmark /path/to/app main
+
+# Test after fix
+pensar benchmark /path/to/app feature/fix-sqli
+
+# Compare results
+```
+
+### CI/CD Integration
+
+Run benchmark in continuous integration:
+
+```yaml .github/workflows/benchmark.yml
+name: Security Benchmark
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches
+
+      - name: Install Pensar Apex
+        run: npm install -g @pensar/apex
+
+      - name: Run Benchmark
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pensar benchmark . main ${{ github.head_ref }}
+
+      - name: Check Results
+        run: |
+          # Fail if PR introduces new CRITICAL vulnerabilities
+          # (implement custom check script)
+```
+
+## How It Works
+
+<Steps>
+  <Step title="Repository Preparation">
+    Pensar clones or accesses the specified repository and validates it's a git repo.
+  </Step>
+
+  <Step title="Branch Iteration">
+    For each specified branch:
+    1. Checks out the branch
+    2. Runs whitebox pentest on the codebase
+    3. Stores findings separately per branch
+  </Step>
+
+  <Step title="Results Comparison">
+    After all branches are tested, generates a comparison report showing:
+    - Vulnerability counts per severity
+    - New vulnerabilities introduced
+    - Vulnerabilities fixed
+    - Trend analysis
+  </Step>
+
+  <Step title="Report Generation">
+    Creates markdown and JSON reports in:
+    ```
+    ~/.pensar/benchmarks/<timestamp>_<repo-name>/
+      ├── comparison.md
+      ├── comparison.json
+      ├── main/
+      │   ├── findings.json
+      │   └── pocs/
+      └── develop/
+          ├── findings.json
+          └── pocs/
+    ```
+  </Step>
+</Steps>
+
+## Use Cases
+
+<Tabs>
+  <Tab title="Development Cycle">
+    Track security improvements across development:
+
+    ```bash
+    # Weekly security benchmarks
+    pensar benchmark /path/to/app --all-branches --limit 10
+    ```
+
+    Monitor if new features introduce vulnerabilities.
+  </Tab>
+
+  <Tab title="Security Fix Validation">
+    Verify security patches work:
+
+    ```bash
+    # Before fix
+    pensar benchmark /path/to/app v1.0.0
+
+    # After fix
+    pensar benchmark /path/to/app v1.0.1
+
+    # Confirm CRITICAL count decreased
+    ```
+  </Tab>
+
+  <Tab title="Code Review">
+    Assess security impact of pull requests:
+
+    ```bash
+    # Compare PR branch against main
+    pensar benchmark /path/to/app main feature/new-auth
+
+    # Review introduced vulnerabilities
+    ```
+  </Tab>
+
+  <Tab title="Historical Analysis">
+    Analyze security trends over time:
+
+    ```bash
+    # Test release tags
+    pensar benchmark /path/to/app v1.0.0 v1.1.0 v1.2.0
+
+    # Plot vulnerability trends
+    ```
+  </Tab>
+</Tabs>
+
+## Limitations
+
+<AccordionGroup>
+  <Accordion title="Requires whitebox access">
+    Benchmark mode needs full source code access. It cannot run on blackbox targets without source.
+  </Accordion>
+
+  <Accordion title="Time intensive">
+    Each branch takes 5-15 minutes to test depending on codebase size. Benchmarking 10 branches may take 1-2 hours.
+  </Accordion>
+
+  <Accordion title="Branch state matters">
+    Tests the code as it exists on each branch at the time of testing. Does not account for runtime environment differences.
+  </Accordion>
+
+  <Accordion title="Determinism not guaranteed">
+    AI-based testing may find different vulnerabilities on repeated runs of the same branch. Use consistent models for comparability.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="'Not a git repository' error">
+    Ensure the path points to a valid git repository:
+
+    ```bash
+    cd /path/to/app
+    git status  # Should show branch info
+    ```
+
+    Initialize git if needed:
+    ```bash
+    git init
+    ```
+  </Accordion>
+
+  <Accordion title="Branch not found">
+    Verify branch exists:
+
+    ```bash
+    git branch -a | grep branch-name
+    ```
+
+    Fetch remote branches if needed:
+    ```bash
+    git fetch --all
+    ```
+  </Accordion>
+
+  <Accordion title="Benchmark taking too long">
+    Use `--limit` to reduce branches:
+
+    ```bash
+    pensar benchmark /path/to/app --all-branches --limit 3
+    ```
+
+    Or test specific branches only:
+    ```bash
+    pensar benchmark /path/to/app main develop
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Whitebox Testing" icon="code" href="/guides/whitebox-testing">
+    Learn more about source code security analysis
+  </Card>
+  <Card title="CI/CD Integration" icon="code-branch" href="/configuration/environment-variables">
+    Automate benchmarks in your pipeline
+  </Card>
+  <Card title="Pentest Command" icon="shield" href="/commands/pentest">
+    Run standard pentests instead of benchmarks
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Use the benchmark API programmatically
+  </Card>
+</CardGroup>

@@ -1,0 +1,270 @@
+---
+title: "Offensive Security Agent API"
+description: "Run the general-purpose offensive security agent directly"
+---
+
+The Offensive Security Agent API provides direct access to the base agent that powers all other specialized agents in Pensar Apex.
+
+## runOffensiveSecurityAgent
+
+Runs the general-purpose offensive security agent with a custom prompt and tools.
+
+<Warning>
+This is a low-level API intended for advanced use cases. Most users should use higher-level APIs like [`runPentestAgent`](/api/blackbox-pentest) or [`runTargetedPentestAgent`](/api/targeted-pentest).
+</Warning>
+
+### Import
+
+```typescript
+import { runOffensiveSecurityAgent } from '@pensar/apex';
+import type { StreamTextResult, ToolSet } from 'ai';
+```
+
+### Function Signature
+
+```typescript
+async function runOffensiveSecurityAgent(
+  input: OffensiveSecurityAgentInput
+): Promise<StreamTextResult<ToolSet, never>>
+```
+
+### Parameters
+
+<ParamField path="input" type="OffensiveSecurityAgentInput" required>
+  Configuration for the offensive security agent.
+
+  <Expandable title="OffensiveSecurityAgentInput">
+    <ParamField path="session" type="SessionInfo" required>
+      Session information for storing results:
+      - `id`: Unique session identifier
+      - `rootPath`: Session root directory
+      - `findingsPath`: Path for findings
+      - `logsPath`: Path for logs
+      - `pocsPath`: Path for POCs
+    </ParamField>
+
+    <ParamField path="objective" type="string" required>
+      Testing objective or goal.
+    </ParamField>
+
+    <ParamField path="target" type="string">
+      Target URL, domain, or IP (optional).
+    </ParamField>
+
+    <ParamField path="model" type="AIModel">
+      AI model to use (default: `claude-sonnet-4-5`).
+    </ParamField>
+
+    <ParamField path="tools" type="ToolSet">
+      Custom tools to make available to the agent.
+    </ParamField>
+
+    <ParamField path="systemPrompt" type="string">
+      System prompt to guide agent behavior.
+    </ParamField>
+
+    <ParamField path="authConfig" type="AIAuthConfig">
+      AI provider authentication.
+    </ParamField>
+
+    <ParamField path="callbacks" type="ConsumeCallbacks">
+      Event handlers for agent execution.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Return Value
+
+<ResponseField name="result" type="StreamTextResult<ToolSet, never>">
+  AI SDK stream result containing:
+  - `text`: Generated text stream
+  - `toolCalls`: Invoked tool calls
+  - `toolResults`: Tool execution results
+  - `finishReason`: Why the agent stopped
+  - `usage`: Token usage statistics
+</ResponseField>
+
+## Example Usage
+
+### Basic Agent Execution
+
+```typescript
+import { runOffensiveSecurityAgent } from '@pensar/apex';
+import { sessions } from '@pensar/apex';
+
+const session = await sessions.create({
+  name: 'Custom Agent Test',
+  targets: ['https://example.com']
+});
+
+const stream = await runOffensiveSecurityAgent({
+  session: {
+    id: session.id,
+    rootPath: session.rootPath,
+    findingsPath: session.findingsPath,
+    logsPath: session.logsPath,
+    pocsPath: session.pocsPath
+  },
+  objective: 'Test for XSS vulnerabilities',
+  target: 'https://example.com',
+  model: 'claude-sonnet-4-5',
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text),
+    onToolCall: (d) => console.log(`→ ${d.toolName}`),
+    onToolResult: (d) => console.log(`✓ Completed`),
+    onError: (e) => console.error('Error:', e)
+  }
+});
+
+// Access stream result
+const { text, toolCalls, usage } = await stream.result;
+console.log(`\nTokens used: ${usage.totalTokens}`);
+```
+
+### Custom Tools
+
+Provide custom tools to the agent:
+
+```typescript
+import { runOffensiveSecurityAgent } from '@pensar/apex';
+import { tool } from 'ai';
+import { z } from 'zod';
+
+const customTools = {
+  analyzeResponse: tool({
+    description: 'Analyze HTTP response for security issues',
+    parameters: z.object({
+      url: z.string(),
+      responseBody: z.string()
+    }),
+    execute: async ({ url, responseBody }) => {
+      // Custom analysis logic
+      return {
+        issues: ['XSS', 'Missing CSP header'],
+        severity: 'HIGH'
+      };
+    }
+  })
+};
+
+const stream = await runOffensiveSecurityAgent({
+  session: sessionInfo,
+  objective: 'Analyze security headers',
+  target: 'https://example.com',
+  tools: customTools,
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text)
+  }
+});
+```
+
+### Custom System Prompt
+
+Provide custom guidance:
+
+```typescript
+const customPrompt = `
+You are a security researcher specializing in API security.
+Focus on:
+- Authentication and authorization flaws
+- API rate limiting
+- Input validation
+- Data exposure
+
+Always document findings with clear evidence and remediation steps.
+`;
+
+const stream = await runOffensiveSecurityAgent({
+  session: sessionInfo,
+  objective: 'Audit API security',
+  target: 'https://api.example.com',
+  systemPrompt: customPrompt,
+  model: 'claude-opus-4'
+});
+```
+
+### Processing Stream Results
+
+Access detailed stream data:
+
+```typescript
+const stream = await runOffensiveSecurityAgent({
+  session: sessionInfo,
+  objective: 'Test target',
+  target: 'https://example.com'
+});
+
+// Wait for completion
+const result = await stream.result;
+
+console.log('Generated text:', result.text);
+console.log('Tool calls:', result.toolCalls.length);
+console.log('Finish reason:', result.finishReason);
+console.log('Usage:', {
+  input: result.usage.promptTokens,
+  output: result.usage.completionTokens,
+  total: result.usage.totalTokens
+});
+```
+
+## When to Use This API
+
+Use `runOffensiveSecurityAgent` when you need:
+
+<AccordionGroup>
+  <Accordion title="Custom agent behavior">
+    Define specialized testing workflows not covered by built-in agents.
+  </Accordion>
+
+  <Accordion title="Custom tools">
+    Integrate your own security tools or APIs with the agent.
+  </Accordion>
+
+  <Accordion title="Fine-grained control">
+    Full control over system prompts, tools, and execution flow.
+  </Accordion>
+
+  <Accordion title="Research and experimentation">
+    Test new attack techniques or analysis approaches.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+For most pentesting scenarios, use the higher-level APIs:
+- [`runPentestAgent`](/api/blackbox-pentest) for full pentests
+- [`runTargetedPentestAgent`](/api/targeted-pentest) for focused testing
+- [`runAttackSurfaceAgent`](/api/attack-surface) for discovery
+</Tip>
+
+## Limitations
+
+<Warning>
+This API requires:
+- Manual session management
+- Custom tool definitions
+- Understanding of agent architecture
+- Proper error handling
+
+It does not provide:
+- Built-in attack surface discovery
+- Automatic finding deduplication
+- Report generation
+- Multi-agent orchestration
+</Warning>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="OffensiveSecurityAgent Class" icon="code" href="/api/agents/offensive-security">
+    Base agent class documentation
+  </Card>
+  <Card title="Pentest Agent" icon="shield" href="/api/agents/pentest">
+    Specialized pentest agent
+  </Card>
+  <Card title="Agents Concept" icon="robot" href="/concepts/agents">
+    Understanding the agent architecture
+  </Card>
+  <Card title="Sessions" icon="folder" href="/configuration/sessions">
+    Managing agent sessions
+  </Card>
+</CardGroup>

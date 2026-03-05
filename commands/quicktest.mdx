@@ -1,0 +1,292 @@
+---
+title: "pensar quicktest"
+description: "Run a focused penetration test with a specific objective"
+---
+
+The `pensar quicktest` command performs a rapid, objective-focused penetration test against a target without running full attack surface discovery.
+
+## Synopsis
+
+```bash
+pensar quicktest --target <target> --objective <objective> [options]
+```
+
+## Description
+
+Quicktest is optimized for fast, targeted security testing when you:
+
+- Want to test a specific hypothesis quickly
+- Already know what vulnerability to look for
+- Need rapid feedback during development
+- Have time constraints
+
+<Note>
+Quicktest skips the full attack surface discovery phase. For comprehensive testing, use [`pensar pentest`](/commands/pentest) instead.
+</Note>
+
+## Required Arguments
+
+<ParamField path="--target" type="string" required>
+  Target URL, domain, or IP address to test.
+
+  ```bash
+  pensar quicktest --target https://example.com --objective "..."
+  ```
+
+  Can be:
+  - Full URL: `https://api.example.com`
+  - Domain: `example.com`
+  - IP address: `192.168.1.100`
+  - Localhost: `http://localhost:3000`
+</ParamField>
+
+<ParamField path="--objective" type="string" required>
+  Testing objective or hypothesis.
+
+  ```bash
+  pensar quicktest \
+    --target https://example.com \
+    --objective "Test for SQL injection in login form"
+  ```
+
+  Be specific about what you want to test.
+</ParamField>
+
+## Options
+
+<ParamField path="--model" type="string" default="claude-sonnet-4-5">
+  AI model to use for testing.
+
+  ```bash
+  pensar quicktest --target ... --objective ... --model claude-opus-4
+  ```
+</ParamField>
+
+<ParamField path="--headers" type="string" default="default">
+  Header mode for requests.
+
+  **Values:**
+  - `none` - No custom headers
+  - `default` - Add `User-Agent: pensar-apex`
+  - `custom` - Use custom headers defined with `--header`
+
+  ```bash
+  pensar quicktest --target ... --objective ... --headers custom
+  ```
+</ParamField>
+
+<ParamField path="--header" type="string">
+  Add custom header (requires `--headers custom`).
+
+  ```bash
+  pensar quicktest \
+    --target api.example.com \
+    --objective "Test API authentication" \
+    --headers custom \
+    --header "User-Agent: pensar_client123" \
+    --header "X-Custom-Header: value"
+  ```
+
+  Can be specified multiple times for multiple headers.
+</ParamField>
+
+## Examples
+
+### Test Specific Vulnerability
+
+```bash
+pensar quicktest \
+  --target http://localhost:3000 \
+  --objective "Find SQL injection vulnerabilities"
+```
+
+<Accordion title="Example Output">
+```
+==========================================================
+QUICKTEST
+==========================================================
+Target:     http://localhost:3000
+Objective:  Find SQL injection vulnerabilities
+Model:      claude-sonnet-4-5
+
+→ Testing objective...
+→ Analyzing application behavior...
+→ Testing SQL injection payloads...
+✓ Found SQL injection in /api/login
+→ Creating proof-of-concept...
+✓ POC created: poc_sqli_login.sh
+
+==========================================================
+RESULTS
+==========================================================
+Findings:  1 (1 CRITICAL)
+Path:      ~/.pensar/sessions/quicktest_abc123/findings.json
+POCs:      ~/.pensar/sessions/quicktest_abc123/pocs/
+Time:      2m 18s
+```
+</Accordion>
+
+### API Security Testing
+
+```bash
+pensar quicktest \
+  --target https://api.example.com \
+  --objective "Test for IDOR vulnerabilities in user endpoints" \
+  --headers custom \
+  --header "Authorization: Bearer eyJ..."
+```
+
+### Development Feedback Loop
+
+Test during development:
+
+```bash
+# After implementing a feature
+pensar quicktest \
+  --target http://localhost:8000 \
+  --objective "Test new file upload feature for path traversal"
+
+# Fix any issues found
+# Re-test
+pensar quicktest \
+  --target http://localhost:8000 \
+  --objective "Verify file upload path traversal is fixed"
+```
+
+### Multiple Custom Headers
+
+```bash
+pensar quicktest \
+  --target api.staging.example.com \
+  --objective "Test authentication bypass" \
+  --headers custom \
+  --header "User-Agent: Mozilla/5.0" \
+  --header "X-API-Key: test-key-123" \
+  --header "X-Request-ID: pensar-test"
+```
+
+## Quicktest vs Pentest
+
+| Feature | Quicktest | Pentest |
+|---------|-----------|----------|
+| **Speed** | Fast (2-5 min) | Comprehensive (10-30 min) |
+| **Scope** | Single objective | Full attack surface |
+| **Discovery** | None | Full recon & mapping |
+| **Best for** | Specific tests | Complete audit |
+| **Use case** | Dev feedback | Production testing |
+
+<Tip>
+Use `quicktest` during development for rapid feedback. Use [`pentest`](/commands/pentest) for comprehensive security audits.
+</Tip>
+
+## Writing Good Objectives
+
+<Tabs>
+  <Tab title="Good Objectives">
+    ✅ **Specific and actionable:**
+
+    ```bash
+    "Test for SQL injection in login form"
+    "Check for IDOR in /api/users/{id} endpoint"
+    "Test file upload for path traversal"
+    "Verify JWT token signature validation"
+    ```
+
+    These objectives are:
+    - Focused on a single vulnerability class
+    - Reference specific components/endpoints
+    - Testable with clear pass/fail criteria
+  </Tab>
+
+  <Tab title="Poor Objectives">
+    ❌ **Too vague or broad:**
+
+    ```bash
+    "Test security"  # Too broad
+    "Find bugs"  # Not security-focused
+    "Check everything"  # Use pentest instead
+    "Is it secure?"  # Not actionable
+    ```
+
+    These don't provide enough guidance for focused testing.
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Development Testing" icon="code">
+    Quick security checks during feature development
+  </Card>
+  <Card title="Hypothesis Testing" icon="flask">
+    Test if a specific vulnerability exists
+  </Card>
+  <Card title="Regression Testing" icon="rotate-right">
+    Verify security fixes work as intended
+  </Card>
+  <Card title="Bug Bounty" icon="bug">
+    Quickly test specific attack vectors
+  </Card>
+</CardGroup>
+
+## Limitations
+
+<Warning>
+Quicktest does not perform:
+- Attack surface discovery
+- Subdomain enumeration
+- Service fingerprinting
+- Comprehensive endpoint mapping
+</Warning>
+
+For complete security coverage, use [`pensar pentest`](/commands/pentest).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No findings with valid objective">
+    Possible reasons:
+
+    1. **Vulnerability doesn't exist** - The specific issue may not be present
+    2. **Objective too narrow** - Try a broader objective or use `pentest`
+    3. **Target unreachable** - Verify network connectivity
+    4. **Authentication required** - Add auth headers with `--header`
+  </Accordion>
+
+  <Accordion title="'--objective is required' error">
+    You must specify at least one objective:
+
+    ```bash
+    pensar quicktest --target example.com --objective "Test for XSS"
+    ```
+  </Accordion>
+
+  <Accordion title="Custom headers not working">
+    Ensure you set `--headers custom`:
+
+    ```bash
+    # Wrong:
+    pensar quicktest --target ... --header "Auth: token"
+
+    # Right:
+    pensar quicktest --target ... --headers custom --header "Auth: token"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Full Pentest" icon="shield" href="/commands/pentest">
+    Run comprehensive security testing
+  </Card>
+  <Card title="Targeted Pentest" icon="bullseye" href="/commands/targeted-pentest">
+    Multiple objectives with full discovery
+  </Card>
+  <Card title="Environment Variables" icon="terminal" href="/configuration/environment-variables">
+    Configure API keys and headers
+  </Card>
+  <Card title="Findings" icon="magnifying-glass" href="/concepts/findings">
+    Understand vulnerability findings
+  </Card>
+</CardGroup>

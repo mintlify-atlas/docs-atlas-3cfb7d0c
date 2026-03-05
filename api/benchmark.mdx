@@ -1,0 +1,197 @@
+---
+title: "Benchmark API"
+description: "Run comparative security benchmarks across code versions"
+---
+
+The Benchmark API allows you to programmatically compare security posture across different branches or commits of a repository.
+
+## runBenchmarkComparisonAgent
+
+Runs a benchmark comparison agent to analyze security differences between code versions.
+
+### Import
+
+```typescript
+import { runBenchmarkComparisonAgent } from '@pensar/apex';
+```
+
+### Function Signature
+
+```typescript
+async function runBenchmarkComparisonAgent(
+  input: BenchmarkComparisonAgentInput
+): Promise<{
+  comparison: BenchmarkComparison | null;
+  resultsPath: string;
+}>
+```
+
+### Parameters
+
+<ParamField path="input" type="BenchmarkComparisonAgentInput" required>
+  Configuration for the benchmark comparison.
+
+  <Expandable title="BenchmarkComparisonAgentInput">
+    <ParamField path="repository" type="string" required>
+      Path to the git repository to benchmark.
+    </ParamField>
+
+    <ParamField path="branches" type="string[]" required>
+      List of branches to compare.
+    </ParamField>
+
+    <ParamField path="model" type="AIModel">
+      AI model to use (default: `claude-sonnet-4-5`).
+    </ParamField>
+
+    <ParamField path="authConfig" type="AIAuthConfig">
+      AI provider authentication configuration.
+    </ParamField>
+
+    <ParamField path="callbacks" type="ConsumeCallbacks">
+      Event handlers for agent execution:
+      - `onTextDelta`: Stream text output
+      - `onToolCall`: Tool invocation events
+      - `onToolResult`: Tool completion events
+      - `onError`: Error handling
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Return Value
+
+<ResponseField name="comparison" type="BenchmarkComparison | null">
+  Comparison results between branches.
+
+  <Expandable title="BenchmarkComparison">
+    <ResponseField name="matched" type="Finding[]">
+      Vulnerabilities found in both branches.
+    </ResponseField>
+
+    <ResponseField name="totalExpected" type="number">
+      Expected number of findings.
+    </ResponseField>
+
+    <ResponseField name="precision" type="number">
+      Precision score (0-1).
+    </ResponseField>
+
+    <ResponseField name="recall" type="number">
+      Recall score (0-1).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="resultsPath" type="string">
+  Path to the results directory.
+</ResponseField>
+
+## Example Usage
+
+### Basic Benchmark
+
+Compare two branches:
+
+```typescript
+import { runBenchmarkComparisonAgent } from '@pensar/apex';
+
+const result = await runBenchmarkComparisonAgent({
+  repository: '/path/to/webapp',
+  branches: ['main', 'develop'],
+  model: 'claude-sonnet-4-5',
+  authConfig: {
+    anthropicAPIKey: process.env.ANTHROPIC_API_KEY
+  },
+  callbacks: {
+    onTextDelta: (d) => process.stdout.write(d.text),
+    onToolCall: (d) => console.log(`→ ${d.toolName}`),
+    onToolResult: (d) => console.log(`✓ ${d.toolName} completed`),
+    onError: (e) => console.error('Error:', e)
+  }
+});
+
+if (result.comparison) {
+  console.log(`Matched: ${result.comparison.matched.length}/${result.comparison.totalExpected}`);
+  console.log(`Precision: ${Math.round(result.comparison.precision * 100)}%`);
+  console.log(`Recall: ${Math.round(result.comparison.recall * 100)}%`);
+}
+```
+
+### Multiple Branches
+
+Compare across multiple versions:
+
+```typescript
+const versions = ['v1.0.0', 'v1.1.0', 'v1.2.0'];
+
+for (let i = 0; i < versions.length - 1; i++) {
+  const result = await runBenchmarkComparisonAgent({
+    repository: '/path/to/api',
+    branches: [versions[i], versions[i + 1]],
+    model: 'claude-opus-4'
+  });
+
+  console.log(`\n${versions[i]} -> ${versions[i + 1]}:`);
+  console.log(`Results: ${result.resultsPath}`);
+}
+```
+
+### CI/CD Integration
+
+Automated benchmark in CI:
+
+```typescript
+import { runBenchmarkComparisonAgent } from '@pensar/apex';
+
+const mainBranch = 'main';
+const prBranch = process.env.GITHUB_HEAD_REF!;
+
+const result = await runBenchmarkComparisonAgent({
+  repository: process.cwd(),
+  branches: [mainBranch, prBranch],
+  model: 'claude-sonnet-4-5',
+  authConfig: {
+    anthropicAPIKey: process.env.ANTHROPIC_API_KEY
+  }
+});
+
+// Fail if PR introduces new critical vulnerabilities
+if (result.comparison && result.comparison.recall < 1.0) {
+  console.error('PR introduces new vulnerabilities!');
+  process.exit(1);
+}
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Release Validation" icon="check">
+    Verify security fixes reduce vulnerabilities
+  </Card>
+  <Card title="Code Review" icon="code-compare">
+    Assess security impact of pull requests
+  </Card>
+  <Card title="Regression Testing" icon="rotate-right">
+    Ensure no security regressions
+  </Card>
+  <Card title="Trend Analysis" icon="chart-line">
+    Track security posture over time
+  </Card>
+</CardGroup>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Benchmark Command" icon="terminal" href="/commands/benchmark">
+    CLI interface for benchmarking
+  </Card>
+  <Card title="Whitebox Testing" icon="code" href="/guides/whitebox-testing">
+    Source code analysis guide
+  </Card>
+  <Card title="CI/CD Integration" icon="code-branch" href="/configuration/environment-variables">
+    Automate benchmarks in pipelines
+  </Card>
+  <Card title="Findings" icon="magnifying-glass" href="/concepts/findings">
+    Understanding vulnerability findings
+  </Card>
+</CardGroup>

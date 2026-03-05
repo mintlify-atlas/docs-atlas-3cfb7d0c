@@ -1,0 +1,451 @@
+---
+title: "pensar swarm"
+description: "Run parallel penetration tests on multiple targets simultaneously"
+---
+
+The `pensar swarm` command orchestrates parallel pentests across multiple targets, enabling efficient large-scale security testing.
+
+## Synopsis
+
+```bash
+pensar swarm <targets> [options]
+```
+
+## Description
+
+Swarm mode allows you to:
+
+- Test multiple targets simultaneously
+- Scale security testing across infrastructure
+- Compare security posture across services
+- Efficiently audit microservice architectures
+
+<Note>
+Swarm mode runs pentests in parallel. Ensure you have adequate API rate limits and system resources.
+</Note>
+
+## Arguments
+
+<ParamField path="targets" type="string" required>
+  JSON string or path to JSON file containing target list.
+
+  **As JSON string:**
+  ```bash
+  pensar swarm '["https://api.example.com", "https://admin.example.com"]'
+  ```
+
+  **As file path:**
+  ```bash
+  pensar swarm targets.json
+  ```
+</ParamField>
+
+## Targets File Format
+
+Create a JSON file with target configurations:
+
+```json targets.json
+[
+  {
+    "url": "https://api.example.com",
+    "name": "API Service",
+    "priority": "high"
+  },
+  {
+    "url": "https://admin.example.com",
+    "name": "Admin Portal",
+    "priority": "high"
+  },
+  {
+    "url": "https://blog.example.com",
+    "name": "Blog",
+    "priority": "low"
+  }
+]
+```
+
+Or simple string array:
+
+```json targets-simple.json
+[
+  "https://api.example.com",
+  "https://admin.example.com",
+  "https://blog.example.com"
+]
+```
+
+## Options
+
+<ParamField path="--model" type="string" default="claude-sonnet-4-5">
+  AI model to use for all pentests.
+
+  ```bash
+  pensar swarm targets.json --model claude-opus-4
+  ```
+
+  All targets will use the same model.
+</ParamField>
+
+<ParamField path="--headers" type="string" default="default">
+  Header mode for requests.
+
+  **Values:**
+  - `none` - No custom headers
+  - `default` - Add `User-Agent: pensar-apex`
+  - `custom` - Use custom headers defined with `--header`
+
+  ```bash
+  pensar swarm targets.json --headers custom
+  ```
+</ParamField>
+
+<ParamField path="--header" type="string">
+  Add custom header to all requests (requires `--headers custom`).
+
+  ```bash
+  pensar swarm targets.json \
+    --headers custom \
+    --header "User-Agent: security-scanner" \
+    --header "X-Scanner-ID: swarm-001"
+  ```
+
+  Can be specified multiple times.
+</ParamField>
+
+## Examples
+
+### Basic Swarm Test
+
+Test multiple microservices:
+
+```bash
+pensar swarm '["https://api.example.com", "https://auth.example.com", "https://data.example.com"]'
+```
+
+<Accordion title="Example Output">
+```
+==========================================================
+SWARM PENTEST
+==========================================================
+Targets: 3
+Model:   claude-sonnet-4-5
+
+[1/3] Testing api.example.com...
+[2/3] Testing auth.example.com...
+[3/3] Testing data.example.com...
+
+→ All tests running in parallel...
+
+✓ api.example.com complete    (5 findings)
+✓ auth.example.com complete   (2 findings)
+✓ data.example.com complete   (8 findings)
+
+==========================================================
+AGGREGATE RESULTS
+==========================================================
+Total Findings: 15
+  CRITICAL: 3
+  HIGH: 6
+  MEDIUM: 4
+  LOW: 2
+
+Results:
+  api.example.com:  ~/.pensar/sessions/swarm_abc/api/
+  auth.example.com: ~/.pensar/sessions/swarm_abc/auth/
+  data.example.com: ~/.pensar/sessions/swarm_abc/data/
+
+Time: 12m 34s (parallel execution)
+```
+</Accordion>
+
+### Using Targets File
+
+Create `targets.json`:
+
+```json
+[
+  "https://staging-api.example.com",
+  "https://staging-admin.example.com",
+  "https://staging-web.example.com"
+]
+```
+
+Run swarm:
+
+```bash
+pensar swarm targets.json
+```
+
+### Custom Headers
+
+Test with authentication:
+
+```bash
+pensar swarm targets.json \
+  --headers custom \
+  --header "Authorization: Bearer eyJ..." \
+  --header "X-Tenant-ID: prod-001"
+```
+
+### No Custom Headers
+
+Disable all custom headers:
+
+```bash
+pensar swarm targets.json --headers none
+```
+
+## Use Cases
+
+<Tabs>
+  <Tab title="Microservices">
+    Test all services in a microservice architecture:
+
+    ```json microservices.json
+    [
+      "https://auth-service.internal",
+      "https://user-service.internal",
+      "https://payment-service.internal",
+      "https://notification-service.internal",
+      "https://api-gateway.internal"
+    ]
+    ```
+
+    ```bash
+    pensar swarm microservices.json
+    ```
+  </Tab>
+
+  <Tab title="Multi-Tenant">
+    Test multiple tenant environments:
+
+    ```json tenants.json
+    [
+      "https://tenant1.example.com",
+      "https://tenant2.example.com",
+      "https://tenant3.example.com"
+    ]
+    ```
+
+    ```bash
+    pensar swarm tenants.json
+    ```
+  </Tab>
+
+  <Tab title="Staging Environments">
+    Test all staging services before production:
+
+    ```json staging.json
+    [
+      "https://staging-api.example.com",
+      "https://staging-web.example.com",
+      "https://staging-admin.example.com"
+    ]
+    ```
+
+    ```bash
+    pensar swarm staging.json --model claude-opus-4
+    ```
+  </Tab>
+
+  <Tab title="Bug Bounty">
+    Test all subdomains in scope:
+
+    ```bash
+    # Discover subdomains (example with subfinder)
+    subfinder -d example.com -o subdomains.txt
+
+    # Convert to JSON
+    cat subdomains.txt | jq -R -s 'split("\n") | map(select(length > 0))' > targets.json
+
+    # Run swarm
+    pensar swarm targets.json
+    ```
+  </Tab>
+</Tabs>
+
+## Performance Considerations
+
+### Parallelization
+
+Swarm runs pentests in parallel:
+
+- **3 targets** = ~3x faster than sequential
+- **10 targets** = ~10x faster than sequential
+
+<Note>
+Parallel execution is limited by:
+- AI provider rate limits
+- System CPU/memory
+- Network bandwidth
+</Note>
+
+### Rate Limiting
+
+If you hit rate limits:
+
+1. **Reduce target count** - Test fewer targets per swarm
+2. **Upgrade API plan** - Increase rate limits with provider
+3. **Use multiple API keys** - Distribute across keys (requires code modification)
+4. **Batch targets** - Run multiple smaller swarms instead of one large one
+
+### Resource Usage
+
+Each parallel pentest consumes:
+
+- **Memory**: ~500MB per target
+- **CPU**: ~25% per target
+- **Network**: ~10-20 MB/s per target
+
+<Warning>
+Testing 20+ targets simultaneously may require significant system resources.
+</Warning>
+
+## Output Structure
+
+Swarm creates a session per target:
+
+```
+~/.pensar/sessions/swarm_<timestamp>/
+├── aggregate-report.md          # Combined report
+├── aggregate-findings.json      # All findings
+├── api.example.com/
+│   ├── findings.json
+│   ├── pocs/
+│   └── report.md
+├── auth.example.com/
+│   ├── findings.json
+│   ├── pocs/
+│   └── report.md
+└── data.example.com/
+    ├── findings.json
+    ├── pocs/
+    └── report.md
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Rate limit errors">
+    Reduce parallel load:
+
+    ```bash
+    # Split targets into smaller batches
+    # Batch 1
+    pensar swarm '["target1", "target2", "target3"]'
+
+    # Batch 2 (after first completes)
+    pensar swarm '["target4", "target5", "target6"]'
+    ```
+
+    Or upgrade your AI provider plan for higher rate limits.
+  </Accordion>
+
+  <Accordion title="JSON parsing error">
+    Verify JSON format:
+
+    ```bash
+    # Test JSON validity
+    cat targets.json | jq .
+    ```
+
+    Common issues:
+    - Missing quotes around strings
+    - Trailing commas
+    - Unescaped quotes in URLs
+  </Accordion>
+
+  <Accordion title="Out of memory">
+    Reduce target count:
+
+    ```bash
+    # Instead of 20 targets at once
+    pensar swarm large-targets.json
+
+    # Split into batches of 5
+    pensar swarm batch-1.json  # 5 targets
+    pensar swarm batch-2.json  # 5 targets
+    pensar swarm batch-3.json  # 5 targets
+    pensar swarm batch-4.json  # 5 targets
+    ```
+  </Accordion>
+
+  <Accordion title="Some targets fail">
+    Check individual logs:
+
+    ```bash
+    # View logs for specific target
+    cat ~/.pensar/sessions/swarm_abc/api.example.com/logs/*.log
+    ```
+
+    Common causes:
+    - Target unreachable
+    - Authentication required
+    - Rate limiting from target
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Organize targets logically">
+    Group related services:
+
+    ```json
+    # staging-services.json
+    ["https://staging-api.example.com", ...]
+
+    # prod-services.json
+    ["https://api.example.com", ...]
+
+    # internal-services.json
+    ["https://auth.internal", ...]
+    ```
+  </Accordion>
+
+  <Accordion title="Start with small batches">
+    Test 2-3 targets first to validate:
+
+    ```bash
+    # Test small batch
+    pensar swarm '["target1", "target2"]'
+
+    # If successful, scale up
+    pensar swarm all-targets.json
+    ```
+  </Accordion>
+
+  <Accordion title="Use descriptive target names">
+    Add metadata to targets:
+
+    ```json
+    [
+      {
+        "url": "https://api.example.com",
+        "name": "Production API",
+        "priority": "critical",
+        "team": "platform"
+      }
+    ]
+    ```
+
+    Makes results easier to triage.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Single Pentest" icon="shield" href="/commands/pentest">
+    Run comprehensive test on one target
+  </Card>
+  <Card title="Quicktest" icon="zap" href="/commands/quicktest">
+    Rapid testing with specific objectives
+  </Card>
+  <Card title="CI/CD Integration" icon="code-branch" href="/configuration/environment-variables">
+    Automate swarm in pipelines
+  </Card>
+  <Card title="Sessions" icon="folder" href="/configuration/sessions">
+    Manage and review swarm results
+  </Card>
+</CardGroup>

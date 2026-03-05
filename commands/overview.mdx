@@ -25,6 +25,18 @@ When invoked without a command, Pensar launches the interactive Terminal UI (TUI
   <Card title="targeted-pentest" icon="crosshairs" href="/commands/targeted-pentest">
     Execute a focused pentest against specific objectives
   </Card>
+  <Card title="quicktest" icon="bolt" href="/commands/quicktest">
+    Run a rapid, objective-focused penetration test
+  </Card>
+  <Card title="benchmark" icon="chart-line" href="/commands/benchmark">
+    Compare security posture across repository branches
+  </Card>
+  <Card title="swarm" icon="network-wired" href="/commands/swarm">
+    Run parallel pentests on multiple targets simultaneously
+  </Card>
+  <Card title="auth" icon="key" href="/commands/auth">
+    Authenticate to target applications and verify auth mechanisms
+  </Card>
   <Card title="doctor" icon="stethoscope" href="/commands/doctor">
     Check dependencies and system configuration
   </Card>
@@ -63,6 +75,39 @@ pensar targeted-pentest \
   --target https://example.com \
   --objective "Test authentication bypass" \
   --objective "Check for SQL injection"
+```
+
+### Quick Test
+
+```bash
+# Rapid, focused testing
+pensar quicktest \
+  --target http://localhost:3000 \
+  --objective "Test for SQL injection"
+```
+
+### Benchmark
+
+```bash
+# Compare security across branches
+pensar benchmark /path/to/repo main develop
+pensar benchmark /path/to/repo --all-branches --limit 5
+```
+
+### Swarm
+
+```bash
+# Test multiple targets in parallel
+pensar swarm targets.json
+pensar swarm '["https://api.example.com", "https://admin.example.com"]'
+```
+
+### Authentication
+
+```bash
+# Authenticate to target
+pensar auth --target https://app.example.com --username admin --password pass
+pensar auth --target https://api.example.com --bearer "eyJ..."
 ```
 
 ### System Check

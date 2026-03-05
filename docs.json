@@ -52,6 +52,10 @@
               "commands/pensar",
               "commands/pentest",
               "commands/targeted-pentest",
+              "commands/quicktest",
+              "commands/benchmark",
+              "commands/swarm",
+              "commands/auth",
               "commands/doctor",
               "commands/upgrade"
             ]
@@ -102,7 +106,9 @@
               "api/blackbox-pentest",
               "api/targeted-pentest",
               "api/authentication",
-              "api/patching"
+              "api/patching",
+              "api/benchmark",
+              "api/offensive-security-agent"
             ]
           },
           {

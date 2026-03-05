@@ -1,0 +1,127 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Pensar Apex",
+  "projectDescription": "AI-powered penetration testing CLI that uses autonomous agents to perform comprehensive blackbox and whitebox pentesting with explainable results.",
+  "theme": "aspen",
+  "primaryColor": "#cb0404",
+  "lightColor": "#f3d2d2",
+  "darkColor": "#e37b84",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/agents",
+              "concepts/attack-surface",
+              "concepts/findings"
+            ]
+          },
+          {
+            "group": "Command Reference",
+            "pages": [
+              "commands/overview",
+              "commands/pensar",
+              "commands/pentest",
+              "commands/targeted-pentest",
+              "commands/doctor",
+              "commands/upgrade"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/ai-providers",
+              "configuration/models",
+              "configuration/sessions",
+              "configuration/environment-variables"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/blackbox-testing",
+              "guides/whitebox-testing",
+              "guides/docker-setup",
+              "guides/authentication",
+              "guides/vllm-setup"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/responsible-use",
+              "security/threat-model",
+              "security/reporting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Overview",
+            "pages": [
+              "api/overview",
+              "api/getting-started"
+            ]
+          },
+          {
+            "group": "Core APIs",
+            "pages": [
+              "api/attack-surface",
+              "api/blackbox-pentest",
+              "api/targeted-pentest",
+              "api/authentication",
+              "api/patching"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "api/agents/offensive-security",
+              "api/agents/attack-surface",
+              "api/agents/pentest",
+              "api/agents/authentication"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "AI-powered autonomous penetration testing",
+    "Blackbox and whitebox testing modes",
+    "Attack surface discovery and mapping",
+    "Automated vulnerability detection and exploitation",
+    "Comprehensive finding reports with POCs",
+    "Multiple AI provider support (Anthropic, OpenAI, AWS Bedrock, vLLM)",
+    "Interactive terminal UI (TUI)",
+    "Docker container with pre-configured pentest tools"
+  ],
+  "publicApiSurface": [
+    "pensar",
+    "pensar pentest",
+    "pensar targeted-pentest",
+    "pensar doctor",
+    "pensar upgrade",
+    "runAttackSurfaceAgent",
+    "runPentestAgent",
+    "runTargetedPentestAgent",
+    "runAuthenticationAgent",
+    "BlackboxAttackSurfaceAgent",
+    "TargetedPentestAgent",
+    "OffensiveSecurityAgent"
+  ]
+}
